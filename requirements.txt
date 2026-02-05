@@ -1,0 +1,32 @@
+# Darwin Multi-Agent System Dependencies
+# =======================================
+
+# CrewAI Framework
+crewai>=0.86.0
+crewai-tools>=0.17.0
+
+# LLM Integration
+langchain>=0.3.0
+langchain-google-genai>=2.0.0
+google-genai>=1.0.0
+
+# Database
+pymongo>=4.6.0
+
+# HTTP & APIs
+requests>=2.31.0
+PyGithub>=2.1.0
+
+# Data Validation
+pydantic>=2.5.0
+pydantic-settings>=2.1.0
+
+# Environment
+python-dotenv>=1.0.0
+
+# CLI & Output
+rich>=13.7.0
+click>=8.1.0
+
+# Utilities
+python-dateutil>=2.8.0
