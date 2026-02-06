@@ -129,6 +129,11 @@ class MongoDBWriteTool(BaseTool):
     Provide the collection name and document as a JSON string.
     Returns the inserted document ID on success.
     
+    IMPORTANT: For code snippets in the document, make sure to:
+    - Escape all double quotes inside strings with backslash
+    - Escape newlines as \\n
+    - Escape backslashes as \\\\
+    
     Example document for signals:
     '{
         "type": "rage_click",
@@ -143,11 +148,71 @@ class MongoDBWriteTool(BaseTool):
     def _run(self, collection: str, document: str) -> str:
         """Write document to MongoDB."""
         try:
-            # Parse document
+            # Try to parse document - with multiple fallback strategies
+            doc_dict = None
+            parse_error = None
+            
+            # Strategy 1: Direct JSON parse
             try:
                 doc_dict = json.loads(document)
-            except json.JSONDecodeError:
-                return f"Invalid JSON document: {document[:100]}..."
+            except json.JSONDecodeError as e:
+                parse_error = str(e)
+            
+            # Strategy 2: Try to fix common issues
+            if doc_dict is None:
+                try:
+                    # Remove leading/trailing whitespace and newlines
+                    cleaned = document.strip()
+                    # Try to fix unescaped newlines in strings
+                    doc_dict = json.loads(cleaned)
+                except json.JSONDecodeError:
+                    pass
+            
+            # Strategy 3: Try to extract JSON from markdown code block
+            if doc_dict is None:
+                try:
+                    import re
+                    # Look for JSON in code blocks
+                    json_match = re.search(r'```(?:json)?\s*(\{.*?\})\s*```', document, re.DOTALL)
+                    if json_match:
+                        doc_dict = json.loads(json_match.group(1))
+                except:
+                    pass
+            
+            # Strategy 4: Try to parse as Python literal (handles single quotes)
+            if doc_dict is None:
+                try:
+                    import ast
+                    doc_dict = ast.literal_eval(document)
+                except:
+                    pass
+            
+            # Strategy 5: Try aggressive cleaning
+            if doc_dict is None:
+                try:
+                    # Replace problematic characters
+                    cleaned = document
+                    # Fix unescaped quotes in code blocks - replace with escaped version
+                    cleaned = re.sub(r'(?<!\\)"(?=[^"]*"[^"]*":)', '\\"', cleaned)
+                    doc_dict = json.loads(cleaned)
+                except:
+                    pass
+            
+            # If all strategies failed, return helpful error
+            if doc_dict is None:
+                # Try to at least save what we can as a text document
+                try:
+                    # Create a fallback document with the raw content
+                    doc_dict = {
+                        "raw_content": document[:5000],  # Limit size
+                        "parse_error": parse_error,
+                        "status": "parse_failed",
+                        "needs_manual_review": True
+                    }
+                    doc_id = insert_one(collection, doc_dict)
+                    return f"⚠️ JSON parsing failed, saved raw content.\n\n**Collection:** {collection}\n**Document ID:** {doc_id}\n**Error:** {parse_error}\n\nPlease ensure JSON is properly escaped."
+                except Exception as fallback_error:
+                    return f"Invalid JSON document. Error: {parse_error}\n\nFirst 200 chars: {document[:200]}...\n\nTip: Ensure all quotes in code snippets are escaped with backslash."
             
             # Add timestamps
             now = datetime.utcnow()

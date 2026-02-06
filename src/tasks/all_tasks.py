@@ -77,14 +77,11 @@ def create_analyze_issues_task(
               - Use github_list_files to explore if needed
            b. Analyze the code to find the root cause:
               - Small touch targets (padding < 16)
-              - Missing press feedback
+              - Missing press feedback (no activeOpacity)
               - Slow operations without loading states
               - Confusing UI patterns
-           c. Formulate a specific fix recommendation with:
-              - Exact file path
-              - Line numbers to modify
-              - Current code snippet
-              - Recommended code change
+           c. Formulate a SIMPLE, SINGLE-CHANGE fix recommendation
+        
         3. Create a UX Issue in MongoDB 'ux_issues' collection with:
            - signal_id: Link to original signal
            - status: "diagnosed"
@@ -96,12 +93,34 @@ def create_analyze_issues_task(
            - user_impact: How users are affected
            - business_impact: Business consequences
            - confidence: Your confidence in the diagnosis (0-1)
-           - recommended_fix: Object with title, description, file_path, 
-             line_start, line_end, original_code, suggested_code
-           - file_path: Primary file to modify
+           - file_path: The exact file to modify (e.g., "app/product/[id].tsx")
+           - recommended_fix: Object with these EXACT fields:
+             * title: Short fix title
+             * description: What the fix does
+             * file_path: Same as above
+             * line_start: Starting line number
+             * line_end: Ending line number
+             * original_code: EXACT code to find (copy from file, keep formatting!)
+             * suggested_code: The replacement code (SAME scope as original!)
+        
         4. Update the original signal's status to "analyzed" and processed=true
         
-        Be specific in your recommendations - the Engineer needs exact code changes.
+        CRITICAL RULES FOR recommended_fix:
+        =====================================
+        1. original_code MUST be copied EXACTLY from the file (same indentation!)
+        2. suggested_code MUST replace ONLY what's in original_code
+        3. Do NOT include imports in suggested_code if original_code doesn't have them
+        4. Keep fixes SMALL and FOCUSED - one change at a time!
+        5. If multiple changes needed, create MULTIPLE issues, one per change
+        
+        GOOD EXAMPLE (simple activeOpacity fix):
+        - original_code: "<TouchableOpacity style={styles.btn} onPress={handleClick}>"
+        - suggested_code: "<TouchableOpacity style={styles.btn} onPress={handleClick} activeOpacity={0.7}>"
+        
+        BAD EXAMPLE (too complex):
+        - original_code: "<TouchableOpacity...>"
+        - suggested_code: "import Haptics...\n<TouchableOpacity...with haptics...>"
+        (This fails because imports aren't in original_code!)
         """,
         expected_output="""
         A detailed analysis report containing:
@@ -126,51 +145,62 @@ def create_fix_and_pr_task(
     """
     Create the fix implementation task for the Engineer Agent.
     
-    This task implements fixes and creates GitHub Pull Requests.
+    This task implements fixes and creates GitHub Pull Requests using PATCH approach.
     """
     return Task(
         description="""
-        Implement code fixes and create GitHub Pull Requests.
+        Implement ONE code fix and create a GitHub Pull Request.
+        
+        IMPORTANT: Only process ONE issue. Use the PATCH-BASED approach!
         
         Steps:
-        1. Get pending tasks from MongoDB OR read diagnosed UX issues
-           - Look for issues with status "diagnosed" or "fix_proposed"
-           - Or use get_pending_tasks if tasks exist
-        2. For the highest priority issue:
-           a. Read the current file content from GitHub
-           b. Apply the recommended fix:
-              - Make the exact changes specified
-              - Preserve existing code style
-              - Don't change anything else
-           c. Create a GitHub Pull Request using github_create_pr:
-              - title: "🧬 Darwin Fix: [Issue Title]"
-              - body: Markdown description with:
-                * Issue summary
-                * Root cause
-                * Changes made
-                * User impact
-                * Affected users count
-              - file_path: Path to the file
-              - new_content: Complete file with fix applied
-        3. Save PR details to MongoDB 'pull_requests' collection:
-           - pr_number
-           - pr_url
-           - branch_name
-           - task_id or ux_issue_id
-           - status: "open"
-        4. Update the UX issue status to "pr_created"
-        5. Report the PR URL
+        1. Query MongoDB for ONE approved issue:
+           - Use: mongodb_read with collection='ux_issues', query='{"status": "approved"}', limit=1
+           - Pick the FIRST issue only
         
-        Important: Read the ENTIRE current file first, then apply changes.
-        The new_content must be the complete file, not just the changed lines.
+        2. Determine the file_path (IMPORTANT - check in this order):
+           a. If recommended_fix is a LIST: use recommended_fix[0].file_path
+           b. If recommended_fix is a DICT: use recommended_fix.file_path
+           c. FALLBACK: use issue.file_path (top-level)
+           - If ALL are "N/A", "unknown", or missing → skip this issue
+        
+        3. Extract the fix details:
+           - Get recommended_fix (if list, use FIRST item)
+           - Get original_code from recommended_fix.original_code OR recommended_fix.code_changes[0].original_code
+           - Get suggested_code from recommended_fix.suggested_code OR recommended_fix.code_changes[0].suggested_code
+        
+        4. Create the PR using github_create_pr with PATCH approach:
+           - title: "🧬 Darwin Fix: [Issue Title]"
+           - body: Markdown description with:
+             * Issue summary
+             * Root cause
+             * Fix description
+           - file_path: Use the file_path determined in step 2
+           - original_code: Copy EXACTLY from the fix
+           - suggested_code: Copy EXACTLY from the fix
+           
+           NOTE: You do NOT need to provide the full file content!
+           The tool will read the file, find original_code, and replace it.
+        
+        4. After PR is created:
+           - Save PR details to MongoDB 'pull_requests' collection with:
+             * issue_id, pr_number, pr_url, branch_name, status="open"
+           - Update the UX issue status to "pr_created" using mongodb_update
+        
+        5. Return the PR URL
+        
+        CRITICAL: 
+        - Do NOT read the file yourself - the PR tool handles it!
+        - Just pass original_code and suggested_code from the issue's recommended_fix
+        - Process exactly ONE issue
         """,
         expected_output="""
         A PR creation report containing:
         - PR URL (clickable link)
         - PR number
         - Branch name
-        - Files changed
-        - Summary of code changes made
+        - File modified
+        - Summary of the patch applied (original → suggested)
         - Confirmation that MongoDB was updated
         - Next steps for human review
         """,

@@ -29,9 +29,9 @@ def create_darwin_crew(
     Create the Darwin crew with all agents and tasks.
     
     Modes:
-    - full: Run complete pipeline (Watcher → Analyst → Engineer)
-    - analyze: Skip Watcher, start from Analyst (requires existing signals)
-    - engineer: Skip to Engineer only (requires existing tasks/issues)
+    - full: Run complete pipeline (Watcher → Analyst → Engineer) - NO approval
+    - analyze: Watcher + Analyst only (detect & diagnose) - SAFE, no PR
+    - engineer: Engineer only (create PRs for approved issues)
     
     Args:
         mode: Pipeline mode to run
@@ -45,17 +45,16 @@ def create_darwin_crew(
     # Create shared LLM instance
     llm = get_gemini_llm()
     
-    # Create agents
-    watcher = create_watcher_agent(llm)
-    analyst = create_analyst_agent(llm)
-    engineer = create_engineer_agent(llm)
-    
     # Create tasks based on mode
     agents = []
     tasks = []
     
     if mode == "full":
-        # Full pipeline: Watcher → Analyst → Engineer
+        # Full pipeline: Watcher → Analyst → Engineer (no approval step)
+        watcher = create_watcher_agent(llm)
+        analyst = create_analyst_agent(llm)
+        engineer = create_engineer_agent(llm)
+        
         task1 = create_detect_signals_task(watcher)
         task2 = create_analyze_issues_task(analyst, context_tasks=[task1])
         task3 = create_fix_and_pr_task(engineer, context_tasks=[task2])
@@ -64,15 +63,20 @@ def create_darwin_crew(
         tasks = [task1, task2, task3]
         
     elif mode == "analyze":
-        # Start from Analyst (assumes signals exist in MongoDB)
-        task2 = create_analyze_issues_task(analyst)
-        task3 = create_fix_and_pr_task(engineer, context_tasks=[task2])
+        # Watcher + Analyst only (SAFE mode - no PR created)
+        # User should run --mode review after this to approve fixes
+        watcher = create_watcher_agent(llm)
+        analyst = create_analyst_agent(llm)
         
-        agents = [analyst, engineer]
-        tasks = [task2, task3]
+        task1 = create_detect_signals_task(watcher)
+        task2 = create_analyze_issues_task(analyst, context_tasks=[task1])
+        
+        agents = [watcher, analyst]
+        tasks = [task1, task2]
         
     elif mode == "engineer":
-        # Engineer only (assumes tasks/issues exist)
+        # Engineer only (create PRs for approved issues)
+        engineer = create_engineer_agent(llm)
         task3 = create_fix_and_pr_task(engineer)
         
         agents = [engineer]

@@ -58,9 +58,14 @@ class PostHogQueryTool(BaseTool):
         query_type: str,
         days: int = 30,
         limit: int = 100,
-        page_filter: Optional[str] = None
+        page_filter: Optional[str] = None,
+        **kwargs  # Accept and ignore extra parameters from LLM
     ) -> str:
         """Execute the PostHog query."""
+        # Log if extra kwargs were passed (for debugging)
+        if kwargs:
+            print(f"[PostHogQueryTool] Ignoring extra parameters: {list(kwargs.keys())}")
+        
         settings = get_settings()
         
         headers = {
