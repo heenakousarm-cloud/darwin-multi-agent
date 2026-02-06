@@ -2,7 +2,7 @@
 
 **Project:** Darwin - AI Growth Engineer  
 **Hackathon:** NitroStack Internal Hackathon  
-**Last Updated:** February 6, 2026
+**Last Updated:** February 7, 2026
 
 ---
 
@@ -10,12 +10,13 @@
 
 1. [Hackathon Requirements](#-hackathon-requirements)
 2. [Current Progress](#-current-progress)
-3. [Gap Analysis](#-gap-analysis)
-4. [Remaining Tasks](#-remaining-tasks)
-5. [Architecture](#-architecture)
-6. [Demo Flow](#-demo-flow)
-7. [Timeline](#-timeline)
-8. [Quick Commands](#-quick-commands)
+3. [Recent Updates (Changelog)](#-recent-updates-changelog)
+4. [Gap Analysis](#-gap-analysis)
+5. [Remaining Tasks](#-remaining-tasks)
+6. [Architecture](#-architecture)
+7. [Demo Flow](#-demo-flow)
+8. [Timeline](#-timeline)
+9. [Quick Commands](#-quick-commands)
 
 ---
 
@@ -40,12 +41,12 @@ Based on [NitroStack Documentation](https://docs.nitrostack.ai/) and the [test-a
 
 | Feature | Description | Status |
 |---------|-------------|--------|
-| `useTheme` | Light/dark mode support | ❌ Not Started |
-| `callTool` | Tool chaining from widgets | ❌ Not Started |
-| `sendFollowUpMessage` | Send messages to chat | ❌ Not Started |
-| `openExternal` | Open URLs in browser | ❌ Not Started |
-| `useWidgetState` | Persist widget state | ❌ Not Started |
-| Display mode controls | Fullscreen, PiP, Inline | ❌ Not Started |
+| `useTheme` | Light/dark mode support | ⬜ Pending |
+| `callTool` | Tool chaining from widgets | ⬜ Pending |
+| `sendFollowUpMessage` | Send messages to chat | ⬜ Pending |
+| `openExternal` | Open URLs in browser | ⬜ Pending |
+| `useWidgetState` | Persist widget state | ⬜ Pending |
+| Display mode controls | Fullscreen, PiP, Inline | ⬜ Pending |
 
 ---
 
@@ -58,21 +59,35 @@ Based on [NitroStack Documentation](https://docs.nitrostack.ai/) and the [test-a
 | **CrewAI Multi-Agent System** | ✅ Complete | 3 agents working |
 | **🕵️ Watcher Agent** | ✅ Complete | Detects friction from PostHog |
 | **🧠 Analyst Agent** | ✅ Complete | Diagnoses root cause, recommends fixes |
-| **👩‍💻 Engineer Agent** | ✅ Complete | Creates GitHub PRs |
+| **👩‍💻 Engineer Agent** | ✅ Complete | Creates GitHub PRs (patch-based) |
 | **PostHog Integration** | ✅ Complete | Rage clicks, events, recordings |
 | **GitHub Integration** | ✅ Complete | Read files, create PRs |
-| **MongoDB Integration** | ✅ Complete | 8 collections configured |
+| **MongoDB Atlas** | ✅ Complete | Cloud database for team collaboration |
 | **Human-in-the-Loop** | ✅ Complete | `--mode review` for approval |
 | **CLI Interface** | ✅ Complete | Multiple modes (analyze, review, engineer) |
+| **🆕 Darwin REST API** | ✅ Complete | FastAPI with API key authentication |
 
-### MongoDB Collections
+### Darwin REST API (NEW)
+
+| Endpoint Category | Endpoints | Status |
+|-------------------|-----------|--------|
+| **Public** | `/`, `/health`, `/docs` | ✅ Working |
+| **Signals** | `/api/signals/`, `/api/signals/summary/by-severity` | ✅ Working |
+| **UX Issues** | `/api/ux-issues/`, `/api/ux-issues/pending-review`, approve/reject | ✅ Working |
+| **Pull Requests** | `/api/pull-requests/`, `/api/pull-requests/summary/stats` | ✅ Working |
+| **Darwin Pipeline** | `/api/darwin/run`, `/api/darwin/status` | ✅ Working |
+| **Stats** | `/api/stats/`, `/api/stats/insights`, `/api/stats/agent-logs` | ✅ Working |
+
+**API Authentication:** Bearer token with `DARWIN_API_KEY`
+
+### MongoDB Collections (Atlas Cloud)
 
 | Collection | Purpose | Status |
 |------------|---------|--------|
 | `signals` | Detected friction signals | ✅ Has data |
 | `ux_issues` | Diagnosed issues with fixes | ✅ Has data |
 | `tasks` | Approved tasks for execution | ✅ Ready |
-| `pull_requests` | PR tracking | ✅ Ready |
+| `pull_requests` | PR tracking | ✅ Has data |
 | `product_metrics` | Business metrics | ✅ Ready |
 | `insights` | AI-generated insights | ✅ Ready |
 | `agent_logs` | Audit trail | ✅ Ready |
@@ -82,12 +97,36 @@ Based on [NitroStack Documentation](https://docs.nitrostack.ai/) and the [test-a
 
 - [x] PostHog API connection (Personal API Key)
 - [x] GitHub API connection (PAT)
-- [x] MongoDB connection (local)
+- [x] MongoDB Atlas connection (cloud)
 - [x] Gemini LLM (gemini-2.5-flash)
 - [x] Watcher detects rage clicks
 - [x] Analyst provides accurate diagnoses
 - [x] Review mode shows BEFORE/AFTER code
 - [x] Approval workflow works
+- [x] Engineer creates PRs (patch-based approach)
+- [x] Darwin REST API (15 endpoints verified)
+- [x] API key authentication working
+
+---
+
+## 📝 Recent Updates (Changelog)
+
+### February 7, 2026
+
+| Change | Description | PR |
+|--------|-------------|-----|
+| **Darwin REST API** | Added FastAPI with 15+ endpoints for NitroStack integration | PR #4 |
+| **API Key Authentication** | Secure Bearer token auth for all protected endpoints | PR #4 |
+| **Documentation Reorganization** | Moved all `.md` files to `docs/` folder | PR #4 |
+
+### February 6, 2026
+
+| Change | Description | PR |
+|--------|-------------|-----|
+| **MongoDB Atlas Migration** | Moved from local MongoDB to cloud Atlas | PR #2 |
+| **Logging Functions** | Added `log_agent_action`, `log_insight`, `log_product_metric` | PR #2 |
+| **Patch-based PR Creation** | Engineer now uses `original_code` + `suggested_code` | PR #1 |
+| **Analyst Guidelines** | Stricter guidelines for smaller, focused patches | PR #1 |
 
 ---
 
@@ -108,12 +147,16 @@ Based on [NitroStack Documentation](https://docs.nitrostack.ai/) and the [test-a
 ```
 ┌─────────────────────────────────────────────────────────────────┐
 │                                                                  │
-│   We have the BRAIN (CrewAI agents)                             │
-│   We're missing the FACE (NitroStack UI)                        │
+│   ✅ We have the BRAIN (CrewAI agents) - COMPLETE               │
+│   ✅ We have the API (Darwin REST API) - COMPLETE               │
+│   ❌ We're missing the FACE (NitroStack UI) - IN PROGRESS       │
 │                                                                  │
 │   The hackathon is about NitroStack, so we need to build        │
 │   the MCP server with widgets that showcase the human-in-       │
 │   the-loop approval workflow.                                    │
+│                                                                  │
+│   KEY CHANGE: NitroStack will connect via Darwin API,           │
+│   NOT directly to MongoDB. This is more secure.                 │
 │                                                                  │
 └─────────────────────────────────────────────────────────────────┘
 ```
@@ -122,45 +165,27 @@ Based on [NitroStack Documentation](https://docs.nitrostack.ai/) and the [test-a
 
 ## 📝 Remaining Tasks
 
-### Phase 1: NitroStack Project Setup (30 min)
+### Phase 1: NitroStack Project Setup (30 min) ⬜
 
 - [ ] Create `darwin-acceleration-engine/` directory
 - [ ] Initialize NitroStack project: `npx nitrostack init`
 - [ ] Configure TypeScript and dependencies
-- [ ] Set up MongoDB connection (TypeScript)
-- [ ] Create `.env` with MongoDB URI
+- [ ] Set up Darwin API connection (NOT direct MongoDB)
+- [ ] Create `.env` with `DARWIN_API_URL` and `DARWIN_API_KEY`
 
-### Phase 2: Tool Definitions (1-2 hours)
+### Phase 2: Tool Definitions (1-2 hours) ⬜
 
-- [ ] **`get_signals`** - Fetch friction signals from MongoDB
-  ```typescript
-  @Tool({ name: 'get_signals', description: 'Get UX friction signals' })
-  @Widget('signals-dashboard')
-  ```
+Tools will call Darwin REST API instead of MongoDB directly:
 
-- [ ] **`get_ux_issues`** - Fetch diagnosed issues
-  ```typescript
-  @Tool({ name: 'get_ux_issues', description: 'Get UX issues with fix recommendations' })
-  @Widget('decision-center')
-  ```
+- [ ] **`get_signals`** - `GET /api/signals/`
+- [ ] **`get_ux_issues`** - `GET /api/ux-issues/`
+- [ ] **`approve_fix`** - `POST /api/ux-issues/{id}/approve`
+- [ ] **`reject_fix`** - `POST /api/ux-issues/{id}/reject`
+- [ ] **`get_pull_requests`** - `GET /api/pull-requests/`
+- [ ] **`trigger_darwin`** - `POST /api/darwin/run`
+- [ ] **`get_stats`** - `GET /api/stats/`
 
-- [ ] **`approve_fix`** - Approve a fix for PR creation
-  ```typescript
-  @Tool({ name: 'approve_fix', description: 'Approve a UX fix' })
-  ```
-
-- [ ] **`get_pull_requests`** - List created PRs
-  ```typescript
-  @Tool({ name: 'get_pull_requests', description: 'Get Darwin PRs' })
-  @Widget('pr-viewer')
-  ```
-
-- [ ] **`trigger_darwin`** - Trigger Darwin pipeline
-  ```typescript
-  @Tool({ name: 'trigger_darwin', description: 'Run Darwin analysis' })
-  ```
-
-### Phase 3: Widget Development (2-3 hours)
+### Phase 3: Widget Development (2-3 hours) ⬜
 
 - [ ] **`signals-dashboard`** widget
   - List of detected signals
@@ -179,18 +204,18 @@ Based on [NitroStack Documentation](https://docs.nitrostack.ai/) and the [test-a
   - Link to GitHub
   - Diff preview
 
-### Phase 4: Integration & Testing (1 hour)
+### Phase 4: Integration & Testing (1 hour) ⬜
 
-- [ ] Connect NitroStack to MongoDB
+- [ ] Connect NitroStack to Darwin API
 - [ ] Test tools in NitroStack Studio
 - [ ] Test widgets render correctly
 - [ ] Test `callTool` from widget
 - [ ] End-to-end flow test
 
-### Phase 5: Demo Preparation (30 min)
+### Phase 5: Demo Preparation (30 min) ⬜
 
 - [ ] Prepare demo script
-- [ ] Inject bug into Luxora app
+- [ ] Generate fresh test data in Luxora
 - [ ] Clear MongoDB for fresh demo
 - [ ] Test complete flow
 - [ ] Record backup video (optional)
@@ -199,23 +224,32 @@ Based on [NitroStack Documentation](https://docs.nitrostack.ai/) and the [test-a
 
 ## 🏗️ Architecture
 
-### Current Architecture (Python Only)
+### Current Architecture (With Darwin API)
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
-│                    CURRENT STATE                                 │
+│                    CURRENT STATE (Feb 7, 2026)                   │
 ├─────────────────────────────────────────────────────────────────┤
 │                                                                  │
 │   📊 PostHog ──► 🕵️ Watcher ──► 🧠 Analyst ──► 👩‍💻 Engineer      │
 │                       │              │              │            │
 │                       ▼              ▼              ▼            │
 │                   ┌───────────────────────────────────┐          │
-│                   │           MongoDB                 │          │
+│                   │       MongoDB Atlas (Cloud)       │          │
 │                   │  signals │ ux_issues │ PRs       │          │
+│                   └───────────────────────────────────┘          │
+│                                   │                              │
+│                                   ▼                              │
+│                   ┌───────────────────────────────────┐          │
+│                   │     🆕 Darwin REST API (FastAPI)  │          │
+│                   │     http://localhost:8000         │          │
+│                   │     • API Key Authentication      │          │
+│                   │     • 15+ Endpoints               │          │
 │                   └───────────────────────────────────┘          │
 │                                                                  │
 │   ✅ Python/CrewAI backend works                                │
-│   ❌ No NitroStack UI                                           │
+│   ✅ Darwin REST API works                                      │
+│   ❌ NitroStack UI (next step)                                  │
 │                                                                  │
 └─────────────────────────────────────────────────────────────────┘
 ```
@@ -238,17 +272,24 @@ Based on [NitroStack Documentation](https://docs.nitrostack.ai/) and the [test-a
 │       │                                                          │
 │       ▼                                                          │
 │   ┌─────────────────────────────────────────┐                   │
-│   │            MongoDB                       │                   │
+│   │         MongoDB Atlas (Cloud)            │                   │
 │   │  signals │ ux_issues │ tasks │ PRs      │                   │
+│   └─────────────────────────────────────────┘                   │
+│       │                                                          │
+│       ▼                                                          │
+│   ┌─────────────────────────────────────────┐                   │
+│   │     🆕 Darwin REST API (FastAPI)        │  ✅ COMPLETE      │
+│   │     http://localhost:8000               │                   │
+│   │     Bearer Token: DARWIN_API_KEY        │                   │
 │   └─────────────────────────────────────────┘                   │
 │       │                                                          │
 │       ▼                                                          │
 │   ┌─────────────────────────────────────────┐                   │
 │   │  darwin-acceleration-engine (NitroStack) │  ◄── TO BUILD    │
 │   │                                          │                   │
-│   │  @Tool('get_signals')                    │                   │
-│   │  @Tool('get_ux_issues')                  │                   │
-│   │  @Tool('approve_fix')                    │                   │
+│   │  @Tool('get_signals')    → API call     │                   │
+│   │  @Tool('get_ux_issues')  → API call     │                   │
+│   │  @Tool('approve_fix')    → API call     │                   │
 │   │                                          │                   │
 │   │  @Widget('signals-dashboard')            │                   │
 │   │  @Widget('decision-center')              │                   │
@@ -324,7 +365,7 @@ Based on [NitroStack Documentation](https://docs.nitrostack.ai/) and the [test-a
 | Phase | Task | Time | Status |
 |-------|------|------|--------|
 | 1 | NitroStack project setup | 30 min | ⬜ Not Started |
-| 2 | Tool definitions | 1-2 hours | ⬜ Not Started |
+| 2 | Tool definitions (API calls) | 1-2 hours | ⬜ Not Started |
 | 3 | Widget development | 2-3 hours | ⬜ Not Started |
 | 4 | Integration & testing | 1 hour | ⬜ Not Started |
 | 5 | Demo preparation | 30 min | ⬜ Not Started |
@@ -337,9 +378,11 @@ Based on [NitroStack Documentation](https://docs.nitrostack.ai/) and the [test-a
 | CrewAI agents | ~4 hours | ✅ Complete |
 | PostHog integration | ~2 hours | ✅ Complete |
 | GitHub integration | ~1 hour | ✅ Complete |
-| MongoDB setup | ~1 hour | ✅ Complete |
+| MongoDB Atlas setup | ~2 hours | ✅ Complete |
 | Human-in-the-loop | ~1 hour | ✅ Complete |
-| **Total Backend** | **~9 hours** | ✅ Complete |
+| Darwin REST API | ~3 hours | ✅ Complete |
+| API key authentication | ~1 hour | ✅ Complete |
+| **Total Backend** | **~14 hours** | ✅ Complete |
 
 ---
 
@@ -352,10 +395,13 @@ Based on [NitroStack Documentation](https://docs.nitrostack.ai/) and the [test-a
 cd /Users/heena/Desktop/Hackathon/darwin-multi-agent
 source venv/bin/activate
 
+# Start Darwin REST API (required for NitroStack)
+python scripts/run_api.py
+
 # Run analysis (safe - no PR)
 python scripts/run_darwin.py --mode analyze
 
-# Review and approve fixes
+# Review and approve fixes (interactive)
 python scripts/run_darwin.py --mode review
 
 # Create PRs for approved issues
@@ -368,7 +414,31 @@ python scripts/run_darwin.py --mode full
 python scripts/run_darwin.py --config
 ```
 
-### MongoDB (Check Data)
+### Darwin REST API
+
+```bash
+# Start API server
+python scripts/run_api.py
+
+# API will be available at:
+# - API URL: http://127.0.0.1:8000
+# - API Docs: http://127.0.0.1:8000/docs
+# - Health: http://127.0.0.1:8000/health
+
+# Test with curl (replace API_KEY with actual key)
+API_KEY="darwin_sk_6hhy8503b6m96nmuv5w84pu5ey5ex8hp"
+
+# Get signals
+curl -H "Authorization: Bearer $API_KEY" http://localhost:8000/api/signals/
+
+# Get UX issues
+curl -H "Authorization: Bearer $API_KEY" http://localhost:8000/api/ux-issues/
+
+# Get stats
+curl -H "Authorization: Bearer $API_KEY" http://localhost:8000/api/stats/
+```
+
+### MongoDB Atlas (Check Data)
 
 ```bash
 # Check signals
@@ -410,25 +480,38 @@ npm run build
 | Aspect | Status | Percentage |
 |--------|--------|------------|
 | **Backend (Python/CrewAI)** | ✅ Complete | 100% |
-| **Database (MongoDB)** | ✅ Complete | 100% |
+| **Database (MongoDB Atlas)** | ✅ Complete | 100% |
 | **Human-in-the-Loop (CLI)** | ✅ Complete | 100% |
+| **Darwin REST API** | ✅ Complete | 100% |
+| **API Authentication** | ✅ Complete | 100% |
 | **NitroStack MCP Server** | ❌ Not Started | 0% |
 | **UI Widgets** | ❌ Not Started | 0% |
-| **Demo Ready** | ⚠️ Partial | 50% |
+| **Demo Ready** | ⚠️ Partial | 60% |
 
-### Overall Hackathon Readiness: **~50%**
+### Overall Hackathon Readiness: **~60%**
 
-The backend is solid. We need to build the NitroStack frontend to complete the hackathon requirements.
+The backend and API layer are solid. We need to build the NitroStack frontend to complete the hackathon requirements.
 
 ---
 
 ## 🎯 Next Steps
 
-1. **Immediate**: Test `--mode review` in terminal (interactive approval)
+1. **Immediate**: Start Darwin REST API (`python scripts/run_api.py`)
 2. **Next**: Create NitroStack project (`darwin-acceleration-engine`)
-3. **Then**: Build tools and widgets
-4. **Finally**: Prepare and rehearse demo
+3. **Then**: Build tools that call Darwin API
+4. **Then**: Build widgets for decision-center
+5. **Finally**: Prepare and rehearse demo
 
 ---
 
-*Last updated: February 6, 2026*
+## 📚 Related Documentation
+
+- [API Key Authentication Guide](./API_KEY_AUTHENTICATION.md)
+- [Darwin Agents Explained](./DARWIN_AGENTS_EXPLAINED.md)
+- [NitroStack Implementation Plan](./NITROSTACK_IMPLEMENTATION_PLAN.md)
+- [Darwin Execution Plan](./DARWIN_EXECUTION_PLAN.md)
+- [Darwin Final Roadmap](./DARWIN_FINAL_ROADMAP.md)
+
+---
+
+*Last updated: February 7, 2026*

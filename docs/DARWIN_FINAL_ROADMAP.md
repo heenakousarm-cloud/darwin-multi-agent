@@ -3,8 +3,19 @@
 > **The Self-Evolving Product Engine**  
 > *"Darwin doesn't just REPORT the weather. It FIXES the roof."*
 
-**Last Updated:** February 4, 2026  
+**Last Updated:** February 7, 2026  
 **Team:** heenakousarm-cloud, anands@wekancode.com
+
+---
+
+## 🆕 Latest Updates (Feb 7, 2026)
+
+| Component | Status | Details |
+|-----------|--------|---------|
+| **Darwin Agents (Python)** | ✅ Complete | All 3 agents working |
+| **MongoDB Atlas** | ✅ Complete | Cloud DB for team collaboration |
+| **Darwin REST API** | ✅ Complete | FastAPI with API key auth |
+| **NitroStack MCP** | ⬜ Next | Tools will call Darwin API |
 
 ---
 
@@ -17,10 +28,11 @@
 5. [Architecture](#5-architecture)
 6. [Data Models](#6-data-models)
 7. [**CrewAI Agents & Tools**](#7-crewai-agents--tools) ⭐ NEW
-8. [Implementation Phases](#8-implementation-phases)
-9. [Bug Injection (Luxora)](#9-bug-injection-luxora)
-10. [Demo Flow](#10-demo-flow)
-11. [Quick Start Guide](#11-quick-start-guide)
+8. [**Darwin REST API**](#8-darwin-rest-api) ⭐ NEW
+9. [Implementation Phases](#9-implementation-phases)
+10. [Bug Injection (Luxora)](#10-bug-injection-luxora)
+11. [Demo Flow](#11-demo-flow)
+12. [Quick Start Guide](#12-quick-start-guide)
 
 ---
 
@@ -66,28 +78,40 @@ Darwin Flow:       PostHog → Watcher → Analyst → Approve → Engineer → 
 │  REPO 1: darwin-multi-agent/           REPO 2: darwin-acceleration-engine/  │
 │  ────────────────────────────          ────────────────────────────────────  │
 │  Language: Python 3.11+                Language: TypeScript                  │
-│  Purpose: AI Agents                    Purpose: NitroStack MCP Server        │
+│  Purpose: AI Agents + REST API         Purpose: NitroStack MCP Server        │
+│  Status: ✅ COMPLETE                   Status: ⬜ TO BUILD                   │
 │                                                                              │
-│  /agents                               /src/resources                        │
-│    ├── watcher.py                        ├── uxIntelligence.ts               │
-│    ├── analyst.py                        ├── signalsAlerts.ts                │
-│    └── engineer.py                       └── decisionCenter.ts               │
+│  /src/agents                           /src/tools (calls Darwin API)         │
+│    ├── watcher.py ✅                     ├── get_signals.ts                  │
+│    ├── analyst.py ✅                     ├── get_ux_issues.ts                │
+│    └── engineer.py ✅                    ├── approve_fix.ts                  │
+│                                          └── trigger_darwin.ts               │
+│  /api (NEW - REST API) ✅                                                    │
+│    ├── main.py                         /src/widgets                          │
+│    ├── middleware/auth.py                ├── signals-dashboard/              │
+│    └── routes/                           ├── decision-center/                │
+│        ├── signals.py                    └── pr-viewer/                      │
+│        ├── ux_issues.py                                                      │
+│        └── darwin.py                                                         │
 │                                                                              │
-│  /scripts                              /src/tools                            │
-│    ├── seed_data.py                      ├── createTask.ts                   │
-│    └── run_*.py                          └── investigate.ts                  │
-│                                                                              │
-│                         ┌─────────────────┐                                  │
-│                         │  MongoDB Local  │                                  │
-│                         │  (Shared DB)    │                                  │
-│                         │  darwin         │                                  │
-│                         └─────────────────┘                                  │
+│                    ┌─────────────────────────────────┐                       │
+│                    │      MongoDB Atlas (Cloud)      │                       │
+│                    │  URI: mongodb+srv://...         │                       │
+│                    │  DB: darwin                     │                       │
+│                    └─────────────────────────────────┘                       │
+│                                  │                                           │
+│                                  ▼                                           │
+│                    ┌─────────────────────────────────┐                       │
+│                    │   Darwin REST API ✅ COMPLETE   │                       │
+│                    │   http://localhost:8000         │                       │
+│                    │   Auth: Bearer DARWIN_API_KEY   │                       │
+│                    └─────────────────────────────────┘                       │
 │                                                                              │
 │                    REPO 3: Luxora_ReactNative/                               │
 │                    ────────────────────────────                              │
 │                    (Existing e-commerce app)                                 │
 │                    GitHub: heenakousarm-cloud/Luxora_ReactNative             │
-│                    Bug Location: app/product/[id].tsx                        │
+│                    PostHog: Integrated for analytics                         │
 │                                                                              │
 └─────────────────────────────────────────────────────────────────────────────┘
 ```
@@ -2442,97 +2466,165 @@ if __name__ == "__main__":
 
 ---
 
-## 8. Implementation Phases
+## 8. Darwin REST API
 
-### Phase 0: Environment Setup (30 min)
+> **NEW (Feb 7, 2026)**: A FastAPI layer between MongoDB and NitroStack for secure data access.
 
-| Task | Command/Action |
-|------|----------------|
-| Start MongoDB | Open MongoDB Compass, connect to localhost |
-| Create database | Create `darwin` database |
-| Create collections | `signals`, `ux_issues`, `tasks`, `pull_requests`, `agent_logs` |
-| Verify Python | `python --version` (need 3.11+) |
+### 8.1 Overview
 
-### Phase 1: Project Structure & Config (1.5 hours)
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                    DARWIN REST API                               │
+├─────────────────────────────────────────────────────────────────┤
+│                                                                  │
+│  URL: http://localhost:8000                                     │
+│  Auth: Bearer Token (DARWIN_API_KEY)                            │
+│  Docs: http://localhost:8000/docs                               │
+│                                                                  │
+│  Why?                                                            │
+│  • NitroStack connects to API, not directly to MongoDB          │
+│  • Single API key for authentication                            │
+│  • Centralized data access control                              │
+│  • Easier to add caching, rate limiting                         │
+│                                                                  │
+└─────────────────────────────────────────────────────────────────┘
+```
 
-| Task | Description | File(s) |
-|------|-------------|---------|
-| 1.1 | Create folder structure | See Section 2.2 |
-| 1.2 | Set up Python venv | `python -m venv venv` |
-| 1.3 | Install CrewAI & dependencies | `pip install -r requirements.txt` |
-| 1.4 | Create settings module | `src/config/settings.py` |
-| 1.5 | Create .env file | `.env` with all API keys |
-| 1.6 | Test API connections | `scripts/test_connections.py` |
+### 8.2 API Endpoints
 
-### Phase 2: Data Models & MongoDB (1 hour)
+| Category | Endpoint | Method | Description |
+|----------|----------|--------|-------------|
+| **Public** | `/` | GET | API info |
+| **Public** | `/health` | GET | Health check |
+| **Public** | `/docs` | GET | Swagger UI |
+| **Signals** | `/api/signals/` | GET | Get friction signals |
+| **Signals** | `/api/signals/summary/by-severity` | GET | Signals by severity |
+| **UX Issues** | `/api/ux-issues/` | GET | Get UX issues |
+| **UX Issues** | `/api/ux-issues/pending-review` | GET | Issues pending review |
+| **UX Issues** | `/api/ux-issues/{id}/approve` | POST | Approve a fix |
+| **UX Issues** | `/api/ux-issues/{id}/reject` | POST | Reject a fix |
+| **PRs** | `/api/pull-requests/` | GET | Get pull requests |
+| **PRs** | `/api/pull-requests/summary/stats` | GET | PR statistics |
+| **Darwin** | `/api/darwin/run` | POST | Trigger pipeline |
+| **Darwin** | `/api/darwin/status` | GET | Pipeline status |
+| **Stats** | `/api/stats/` | GET | Dashboard stats |
+| **Stats** | `/api/stats/insights` | GET | AI insights |
+| **Stats** | `/api/stats/agent-logs` | GET | Agent activity |
 
-| Task | Description | File(s) |
-|------|-------------|---------|
-| 2.1 | Create enum definitions | `src/models/enums.py` |
-| 2.2 | Create Signal model | `src/models/signal.py` |
-| 2.3 | Create UXIssue model | `src/models/ux_issue.py` |
-| 2.4 | Create Task model | `src/models/task.py` |
-| 2.5 | Create MongoDB client | `src/db/mongodb.py` |
+### 8.3 Quick Start
 
-### Phase 3: CrewAI Custom Tools (2 hours)
+```bash
+# Start Darwin API
+cd /Users/heena/Desktop/Hackathon/darwin-multi-agent
+source venv/bin/activate
+python scripts/run_api.py
 
-| Task | Description | File(s) |
-|------|-------------|---------|
-| 3.1 | Create PostHogQueryTool | `src/tools/posthog_tools.py` |
-| 3.2 | Create PostHogRecordingsTool | `src/tools/posthog_tools.py` |
-| 3.3 | Create GitHubReadTool | `src/tools/github_tools.py` |
-| 3.4 | Create GitHubPRTool | `src/tools/github_tools.py` |
-| 3.5 | Create MongoDBReadTool | `src/tools/mongodb_tools.py` |
-| 3.6 | Create MongoDBWriteTool | `src/tools/mongodb_tools.py` |
-| 3.7 | Test each tool individually | Unit tests |
+# Test endpoints
+API_KEY="darwin_sk_6hhy8503b6m96nmuv5w84pu5ey5ex8hp"
 
-### Phase 4: CrewAI Agents (2 hours)
+# Get signals
+curl -H "Authorization: Bearer $API_KEY" http://localhost:8000/api/signals/
 
-| Task | Description | File(s) |
-|------|-------------|---------|
-| 4.1 | Create Watcher Agent | `src/agents/watcher.py` |
-| 4.2 | Create Analyst Agent | `src/agents/analyst.py` |
-| 4.3 | Create Engineer Agent | `src/agents/engineer.py` |
-| 4.4 | Test each agent standalone | Manual testing |
+# Get UX issues
+curl -H "Authorization: Bearer $API_KEY" http://localhost:8000/api/ux-issues/
 
-### Phase 5: CrewAI Tasks & Crew (1.5 hours)
+# Approve a fix
+curl -X POST -H "Authorization: Bearer $API_KEY" http://localhost:8000/api/ux-issues/{id}/approve
+```
 
-| Task | Description | File(s) |
-|------|-------------|---------|
-| 5.1 | Create detect_signals task | `src/tasks/all_tasks.py` |
-| 5.2 | Create analyze_issues task | `src/tasks/all_tasks.py` |
-| 5.3 | Create create_fixes task | `src/tasks/all_tasks.py` |
-| 5.4 | Create Darwin Crew | `src/crew/darwin_crew.py` |
-| 5.5 | Create main entry script | `scripts/run_darwin.py` |
-| 5.6 | Test full pipeline | `python scripts/run_darwin.py` |
+---
 
-### Phase 6: darwin-acceleration-engine / NitroStack (2 hours)
+## 9. Implementation Phases
 
-| Task | Description | File(s) |
-|------|-------------|---------|
-| 6.1 | Initialize NitroStack project | `npx create-nitrostack-app` |
-| 6.2 | Set up MongoDB connection | `src/db/mongodb.ts` |
-| 6.3 | Create uxIntelligence resource | `src/resources/uxIntelligence.ts` |
-| 6.4 | Create createTask tool | `src/tools/createTask.ts` |
-| 6.5 | Test in NitroStudio | `npx nitrostudio` |
+### Phase 0: Environment Setup ✅ COMPLETE
 
-### Phase 7: Bug Injection & Integration (1 hour)
+| Task | Status | Notes |
+|------|--------|-------|
+| MongoDB Atlas | ✅ | Cloud DB configured |
+| Create database | ✅ | `darwin` database |
+| Create collections | ✅ | 8 collections |
+| Python venv | ✅ | 3.11+ |
 
-| Task | Description |
-|------|-------------|
-| 7.1 | Clone Luxora repo locally |
-| 7.2 | Inject bug into Add to Cart button |
-| 7.3 | Commit and push bug |
-| 7.4 | Seed demo data in MongoDB |
-| 7.5 | Run full Darwin pipeline |
-| 7.6 | Verify PR appears on GitHub |
+### Phase 1: Project Structure & Config ✅ COMPLETE
 
-### Phase 8: Demo Polish (1 hour)
+| Task | Status | File(s) |
+|------|--------|---------|
+| Create folder structure | ✅ | See Section 2.2 |
+| Set up Python venv | ✅ | `python -m venv venv` |
+| Install dependencies | ✅ | `pip install -r requirements.txt` |
+| Create settings module | ✅ | `src/config/settings.py` |
+| Create .env file | ✅ | `.env` with all API keys |
 
-| Task | Description |
-|------|-------------|
-| 8.1 | Create demo script |
-| 8.2 | Set up terminal layouts |
+### Phase 2: Data Models & MongoDB ✅ COMPLETE
+
+| Task | Status | File(s) |
+|------|--------|---------|
+| Create enum definitions | ✅ | `src/models/enums.py` |
+| Create Signal model | ✅ | `src/models/signal.py` |
+| Create UXIssue model | ✅ | `src/models/ux_issue.py` |
+| Create MongoDB client | ✅ | `src/db/mongodb.py` |
+
+### Phase 3: CrewAI Custom Tools ✅ COMPLETE
+
+| Task | Status | File(s) |
+|------|--------|---------|
+| Create PostHogQueryTool | ✅ | `src/tools/posthog_tools.py` |
+| Create GitHubReadTool | ✅ | `src/tools/github_tools.py` |
+| Create GitHubPRTool | ✅ | `src/tools/github_tools.py` (patch-based) |
+| Create MongoDBReadTool | ✅ | `src/tools/mongodb_tools.py` |
+| Create MongoDBWriteTool | ✅ | `src/tools/mongodb_tools.py` |
+
+### Phase 4: CrewAI Agents ✅ COMPLETE
+
+| Task | Status | File(s) |
+|------|--------|---------|
+| Create Watcher Agent | ✅ | `src/agents/watcher.py` |
+| Create Analyst Agent | ✅ | `src/agents/analyst.py` |
+| Create Engineer Agent | ✅ | `src/agents/engineer.py` |
+
+### Phase 5: CrewAI Tasks & Crew ✅ COMPLETE
+
+| Task | Status | File(s) |
+|------|--------|---------|
+| Create all tasks | ✅ | `src/tasks/all_tasks.py` |
+| Create Darwin Crew | ✅ | `src/crew/darwin_crew.py` |
+| Create main entry script | ✅ | `scripts/run_darwin.py` |
+
+### Phase 5.5: Darwin REST API ✅ COMPLETE (NEW)
+
+| Task | Status | File(s) |
+|------|--------|---------|
+| Create FastAPI app | ✅ | `api/main.py` |
+| Add API key auth | ✅ | `api/middleware/auth.py` |
+| Create routes | ✅ | `api/routes/*.py` |
+| Create API runner | ✅ | `scripts/run_api.py` |
+| Test all endpoints | ✅ | 15 endpoints verified |
+
+### Phase 6: darwin-acceleration-engine / NitroStack ⬜ NEXT
+
+| Task | Status | Description |
+|------|--------|-------------|
+| 6.1 | ⬜ | Initialize NitroStack project |
+| 6.2 | ⬜ | Set up Darwin API connection (NOT MongoDB) |
+| 6.3 | ⬜ | Create tools that call Darwin API |
+| 6.4 | ⬜ | Create widgets (signals-dashboard, decision-center) |
+| 6.5 | ⬜ | Test in NitroStudio |
+
+### Phase 7: Integration Testing ⬜ PENDING
+
+| Task | Status | Description |
+|------|--------|-------------|
+| 7.1 | ⬜ | Generate test data in Luxora |
+| 7.2 | ⬜ | Run full Darwin pipeline |
+| 7.3 | ⬜ | Test NitroStack widgets |
+| 7.4 | ⬜ | Verify PR creation |
+
+### Phase 8: Demo Polish ⬜ PENDING
+
+| Task | Status | Description |
+|------|--------|-------------|
+| 8.1 | ⬜ | Create demo script |
+| 8.2 | ⬜ | Set up terminal layouts |
 | 8.3 | Practice full demo 3x |
 | 8.4 | Record backup video |
 

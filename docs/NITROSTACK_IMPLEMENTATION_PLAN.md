@@ -3,8 +3,32 @@
 **Project:** Darwin Acceleration Engine  
 **Goal:** Utilize ALL NitroStack features for hackathon presentation  
 **Target Coverage:** 100% (22/22 features)  
-**Estimated Time:** ~15 hours  
-**Last Updated:** February 6, 2026
+**Estimated Time:** ~12-15 hours  
+**Last Updated:** February 7, 2026
+
+---
+
+## 🆕 Important Update (Feb 7, 2026)
+
+**Architecture Change:** NitroStack will now connect via **Darwin REST API** instead of direct MongoDB access.
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│  PREVIOUS APPROACH (Direct MongoDB)                             │
+│  NitroStack → MongoDB                                           │
+│                                                                  │
+│  NEW APPROACH (Via Darwin API) ✅                               │
+│  NitroStack → Darwin REST API → MongoDB                         │
+│                                                                  │
+│  Benefits:                                                       │
+│  • Single API key for authentication                            │
+│  • No MongoDB credentials exposed to NitroStack                 │
+│  • Centralized data access control                              │
+│  • Easier to add caching, rate limiting at API level            │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+**Darwin REST API is now COMPLETE** with 15+ endpoints at `http://localhost:8000`
 
 ---
 
@@ -121,13 +145,18 @@ darwin-acceleration-engine/
 
 ```env
 # .env
-MONGODB_URI=mongodb://localhost:27017/darwin
-GITHUB_TOKEN=ghp_your_token
-POSTHOG_API_KEY=phx_your_key
-API_KEY=darwin_secret_key_123
+# Darwin API Connection (NEW - replaces direct MongoDB)
+DARWIN_API_URL=http://localhost:8000
+DARWIN_API_KEY=darwin_sk_6hhy8503b6m96nmuv5w84pu5ey5ex8hp
+
+# NitroStack Configuration
+NITROSTACK_PORT=3000
 CACHE_TTL=300
 RATE_LIMIT_MAX=100
 RATE_LIMIT_WINDOW=60000
+
+# Note: MongoDB credentials are NOT needed here!
+# NitroStack connects to Darwin API, which handles MongoDB access.
 ```
 
 ### 1.4 NitroStack Configuration
@@ -199,26 +228,11 @@ export default defineConfig({
 // src/tools/signals.ts
 import { Tool } from 'nitrostack';
 import { z } from 'zod';
-import { mongodb } from '../lib/mongodb';
+import { darwinApi } from '../lib/darwin-api';  // NEW: Use Darwin API instead of MongoDB
 
 const SignalsInputSchema = z.object({
-  status: z.enum(['new', 'processing', 'processed', 'all']).optional().default('all'),
   severity: z.enum(['critical', 'high', 'medium', 'low', 'all']).optional().default('all'),
   limit: z.number().min(1).max(100).optional().default(20),
-  page: z.enum(['cart', 'checkout', 'product', 'home', 'all']).optional().default('all'),
-});
-
-const SignalSchema = z.object({
-  _id: z.string(),
-  type: z.string(),
-  severity: z.string(),
-  page: z.string(),
-  element: z.string(),
-  count: z.number(),
-  affected_users: z.number(),
-  first_seen: z.string(),
-  last_seen: z.string(),
-  status: z.string(),
 });
 
 @Tool({
@@ -236,44 +250,24 @@ const SignalSchema = z.object({
     Use this to see what UX issues Darwin has detected in the Luxora app.
   `,
   inputSchema: SignalsInputSchema,
-  outputSchema: z.object({
-    signals: z.array(SignalSchema),
-    total: z.number(),
-    summary: z.object({
-      critical: z.number(),
-      high: z.number(),
-      medium: z.number(),
-      low: z.number(),
-    }),
-  }),
 })
 @Widget('signals-dashboard')  // Attach widget to this tool
 export async function getSignals(input: z.infer<typeof SignalsInputSchema>) {
-  const query: any = {};
+  // NEW: Call Darwin REST API instead of direct MongoDB
+  const params = new URLSearchParams();
+  if (input.severity !== 'all') params.append('severity', input.severity);
+  params.append('limit', input.limit.toString());
   
-  if (input.status !== 'all') {
-    query.status = input.status;
-  }
-  if (input.severity !== 'all') {
-    query.severity = input.severity;
-  }
-  if (input.page !== 'all') {
-    query.page = input.page;
-  }
+  const response = await darwinApi.get(`/api/signals/?${params}`);
   
-  const signals = await mongodb.find('signals', query, { limit: input.limit });
-  const total = await mongodb.count('signals', query);
+  // Also get severity summary
+  const summaryResponse = await darwinApi.get('/api/signals/summary/by-severity');
   
-  // Calculate summary
-  const allSignals = await mongodb.find('signals', {});
-  const summary = {
-    critical: allSignals.filter(s => s.severity === 'critical').length,
-    high: allSignals.filter(s => s.severity === 'high').length,
-    medium: allSignals.filter(s => s.severity === 'medium').length,
-    low: allSignals.filter(s => s.severity === 'low').length,
+  return {
+    signals: response.signals,
+    total: response.count,
+    summary: summaryResponse,
   };
-  
-  return { signals, total, summary };
 }
 ```
 
@@ -283,36 +277,11 @@ export async function getSignals(input: z.infer<typeof SignalsInputSchema>) {
 // src/tools/ux-issues.ts
 import { Tool } from 'nitrostack';
 import { z } from 'zod';
-import { mongodb } from '../lib/mongodb';
+import { darwinApi } from '../lib/darwin-api';  // NEW: Use Darwin API
 
 const UxIssuesInputSchema = z.object({
   status: z.enum(['diagnosed', 'approved', 'pr_created', 'merged', 'all']).optional().default('all'),
-  priority: z.enum(['critical', 'high', 'medium', 'low', 'all']).optional().default('all'),
   limit: z.number().min(1).max(50).optional().default(10),
-});
-
-const RecommendedFixSchema = z.object({
-  title: z.string(),
-  description: z.string(),
-  file_path: z.string(),
-  original_code: z.string(),
-  suggested_code: z.string(),
-  line_start: z.number().optional(),
-  line_end: z.number().optional(),
-});
-
-const UxIssueSchema = z.object({
-  _id: z.string(),
-  title: z.string(),
-  priority: z.string(),
-  confidence: z.number(),
-  page: z.string(),
-  file_path: z.string(),
-  root_cause: z.string(),
-  user_impact: z.string(),
-  recommended_fix: RecommendedFixSchema,
-  status: z.string(),
-  created_at: z.string(),
 });
 
 @Tool({
@@ -330,31 +299,23 @@ const UxIssueSchema = z.object({
     Issues with status 'diagnosed' are ready for human review.
   `,
   inputSchema: UxIssuesInputSchema,
-  outputSchema: z.object({
-    issues: z.array(UxIssueSchema),
-    total: z.number(),
-    pending_review: z.number(),
-  }),
 })
 @Widget('decision-center')  // Main approval widget
 export async function getUxIssues(input: z.infer<typeof UxIssuesInputSchema>) {
-  const query: any = {};
+  // NEW: Call Darwin REST API
+  const params = new URLSearchParams();
+  if (input.status !== 'all') params.append('status', input.status);
+  params.append('limit', input.limit.toString());
   
-  if (input.status !== 'all') {
-    query.status = input.status;
-  }
-  if (input.priority !== 'all') {
-    query.priority = input.priority;
-  }
+  const response = await darwinApi.get(`/api/ux-issues/?${params}`);
   
-  const issues = await mongodb.find('ux_issues', query, { limit: input.limit });
-  const total = await mongodb.count('ux_issues', query);
-  const pendingReview = await mongodb.count('ux_issues', { status: 'diagnosed' });
+  // Get pending review count
+  const pendingResponse = await darwinApi.get('/api/ux-issues/pending-review');
   
   return {
-    issues,
-    total,
-    pending_review: pendingReview,
+    issues: response.issues,
+    total: response.count,
+    pending_review: pendingResponse.count,
   };
 }
 ```
@@ -365,8 +326,7 @@ export async function getUxIssues(input: z.infer<typeof UxIssuesInputSchema>) {
 // src/tools/approve-fix.ts
 import { Tool } from 'nitrostack';
 import { z } from 'zod';
-import { mongodb } from '../lib/mongodb';
-import { execSync } from 'child_process';
+import { darwinApi } from '../lib/darwin-api';  // NEW: Use Darwin API
 
 const ApproveFixInputSchema = z.object({
   issue_id: z.string().describe('The MongoDB _id of the UX issue to approve'),
@@ -387,23 +347,15 @@ const ApproveFixInputSchema = z.object({
     IMPORTANT: Always review the code diff before approving!
   `,
   inputSchema: ApproveFixInputSchema,
-  outputSchema: z.object({
-    success: z.boolean(),
-    message: z.string(),
-    issue_id: z.string(),
-    new_status: z.string(),
-    task_created: z.boolean(),
-    pr_triggered: z.boolean(),
-  }),
 })
 export async function approveFix(input: z.infer<typeof ApproveFixInputSchema>) {
-  // Find the issue
-  const issue = await mongodb.findOne('ux_issues', { _id: input.issue_id });
+  // NEW: Call Darwin REST API to approve the issue
+  const response = await darwinApi.post(`/api/ux-issues/${input.issue_id}/approve`);
   
-  if (!issue) {
+  if (!response.success) {
     return {
       success: false,
-      message: `Issue not found: ${input.issue_id}`,
+      message: response.message || 'Failed to approve issue',
       issue_id: input.issue_id,
       new_status: 'unknown',
       task_created: false,
@@ -411,42 +363,12 @@ export async function approveFix(input: z.infer<typeof ApproveFixInputSchema>) {
     };
   }
   
-  if (issue.status !== 'diagnosed') {
-    return {
-      success: false,
-      message: `Issue already processed. Current status: ${issue.status}`,
-      issue_id: input.issue_id,
-      new_status: issue.status,
-      task_created: false,
-      pr_triggered: false,
-    };
-  }
-  
-  // Update issue status to approved
-  await mongodb.updateOne('ux_issues', { _id: input.issue_id }, { status: 'approved' });
-  
-  // Create a task for the Engineer agent
-  const task = {
-    issue_id: input.issue_id,
-    title: issue.title,
-    file_path: issue.file_path,
-    recommended_fix: issue.recommended_fix,
-    status: 'pending',
-    created_at: new Date().toISOString(),
-    approved_by: 'human',
-  };
-  
-  await mongodb.insertOne('tasks', task);
-  
-  // Optionally trigger PR creation
+  // Optionally trigger PR creation via Darwin API
   let prTriggered = false;
   if (input.create_pr_immediately) {
     try {
-      // Trigger Darwin Engineer agent
-      execSync('cd /Users/heena/Desktop/Hackathon/darwin-multi-agent && source venv/bin/activate && python scripts/run_darwin.py --mode engineer', {
-        timeout: 120000, // 2 minute timeout
-      });
-      prTriggered = true;
+      const runResponse = await darwinApi.post('/api/darwin/run', { mode: 'engineer' });
+      prTriggered = runResponse.success;
     } catch (error) {
       console.error('Failed to trigger PR creation:', error);
     }
@@ -469,25 +391,11 @@ export async function approveFix(input: z.infer<typeof ApproveFixInputSchema>) {
 // src/tools/pull-requests.ts
 import { Tool } from 'nitrostack';
 import { z } from 'zod';
-import { mongodb } from '../lib/mongodb';
+import { darwinApi } from '../lib/darwin-api';  // NEW: Use Darwin API
 
 const PullRequestsInputSchema = z.object({
   status: z.enum(['open', 'merged', 'closed', 'all']).optional().default('all'),
   limit: z.number().min(1).max(50).optional().default(10),
-});
-
-const PullRequestSchema = z.object({
-  _id: z.string(),
-  pr_number: z.number(),
-  title: z.string(),
-  description: z.string(),
-  branch: z.string(),
-  status: z.string(),
-  url: z.string(),
-  issue_id: z.string(),
-  files_changed: z.array(z.string()),
-  created_at: z.string(),
-  merged_at: z.string().optional(),
 });
 
 @Tool({
@@ -505,36 +413,24 @@ const PullRequestSchema = z.object({
     Use this to track the status of fixes Darwin has implemented.
   `,
   inputSchema: PullRequestsInputSchema,
-  outputSchema: z.object({
-    pull_requests: z.array(PullRequestSchema),
-    total: z.number(),
-    stats: z.object({
-      open: z.number(),
-      merged: z.number(),
-      closed: z.number(),
-    }),
-  }),
 })
 @Widget('pr-viewer')
 export async function getPullRequests(input: z.infer<typeof PullRequestsInputSchema>) {
-  const query: any = {};
+  // NEW: Call Darwin REST API
+  const params = new URLSearchParams();
+  if (input.status !== 'all') params.append('status', input.status);
+  params.append('limit', input.limit.toString());
   
-  if (input.status !== 'all') {
-    query.status = input.status;
-  }
+  const response = await darwinApi.get(`/api/pull-requests/?${params}`);
   
-  const pullRequests = await mongodb.find('pull_requests', query, { limit: input.limit });
-  const total = await mongodb.count('pull_requests', query);
+  // Get PR stats
+  const statsResponse = await darwinApi.get('/api/pull-requests/summary/stats');
   
-  // Calculate stats
-  const allPRs = await mongodb.find('pull_requests', {});
-  const stats = {
-    open: allPRs.filter(pr => pr.status === 'open').length,
-    merged: allPRs.filter(pr => pr.status === 'merged').length,
-    closed: allPRs.filter(pr => pr.status === 'closed').length,
+  return {
+    pull_requests: response.pull_requests,
+    total: response.count,
+    stats: statsResponse,
   };
-  
-  return { pull_requests: pullRequests, total, stats };
 }
 ```
 
@@ -544,7 +440,7 @@ export async function getPullRequests(input: z.infer<typeof PullRequestsInputSch
 // src/tools/trigger-darwin.ts
 import { Tool } from 'nitrostack';
 import { z } from 'zod';
-import { execSync } from 'child_process';
+import { darwinApi } from '../lib/darwin-api';  // NEW: Use Darwin API
 
 const TriggerDarwinInputSchema = z.object({
   mode: z.enum(['analyze', 'engineer', 'full']).describe(`
@@ -568,12 +464,6 @@ const TriggerDarwinInputSchema = z.object({
     Use 'analyze' first, review issues, approve them, then use 'engineer'.
   `,
   inputSchema: TriggerDarwinInputSchema,
-  outputSchema: z.object({
-    success: z.boolean(),
-    message: z.string(),
-    mode: z.string(),
-    output: z.string().optional(),
-  }),
 })
 export async function triggerDarwin(input: z.infer<typeof TriggerDarwinInputSchema>) {
   if (input.dry_run) {
@@ -585,25 +475,20 @@ export async function triggerDarwin(input: z.infer<typeof TriggerDarwinInputSche
   }
   
   try {
-    const command = `cd /Users/heena/Desktop/Hackathon/darwin-multi-agent && source venv/bin/activate && python scripts/run_darwin.py --mode ${input.mode}`;
-    
-    const output = execSync(command, {
-      timeout: 300000, // 5 minute timeout
-      encoding: 'utf-8',
-    });
+    // NEW: Call Darwin REST API to trigger pipeline
+    const response = await darwinApi.post('/api/darwin/run', { mode: input.mode });
     
     return {
-      success: true,
-      message: `✅ Darwin '${input.mode}' completed successfully`,
+      success: response.success,
+      message: response.message || `✅ Darwin '${input.mode}' triggered successfully`,
       mode: input.mode,
-      output: output.slice(-2000), // Last 2000 chars
+      output: response.output,
     };
   } catch (error: any) {
     return {
       success: false,
       message: `❌ Darwin '${input.mode}' failed: ${error.message}`,
       mode: input.mode,
-      output: error.stderr?.slice(-1000),
     };
   }
 }
@@ -611,12 +496,69 @@ export async function triggerDarwin(input: z.infer<typeof TriggerDarwinInputSche
 
 ---
 
+### NEW: Darwin API Client Library
+
+```typescript
+// src/lib/darwin-api.ts
+// NEW FILE: HTTP client for Darwin REST API
+
+const DARWIN_API_URL = process.env.DARWIN_API_URL || 'http://localhost:8000';
+const DARWIN_API_KEY = process.env.DARWIN_API_KEY;
+
+if (!DARWIN_API_KEY) {
+  throw new Error('DARWIN_API_KEY environment variable is required');
+}
+
+class DarwinApiClient {
+  private baseUrl: string;
+  private apiKey: string;
+
+  constructor(baseUrl: string, apiKey: string) {
+    this.baseUrl = baseUrl;
+    this.apiKey = apiKey;
+  }
+
+  private async request(method: string, path: string, body?: any) {
+    const url = `${this.baseUrl}${path}`;
+    
+    const response = await fetch(url, {
+      method,
+      headers: {
+        'Authorization': `Bearer ${this.apiKey}`,
+        'Content-Type': 'application/json',
+      },
+      body: body ? JSON.stringify(body) : undefined,
+    });
+
+    if (!response.ok) {
+      throw new Error(`Darwin API error: ${response.status} ${response.statusText}`);
+    }
+
+    return response.json();
+  }
+
+  async get(path: string) {
+    return this.request('GET', path);
+  }
+
+  async post(path: string, body?: any) {
+    return this.request('POST', path, body);
+  }
+}
+
+export const darwinApi = new DarwinApiClient(DARWIN_API_URL, DARWIN_API_KEY);
+```
+
+---
+
 ### Feature 2: Resources (5 Resources)
+
+All resources now use Darwin API instead of direct MongoDB:
 
 ```typescript
 // src/resources/signals-resource.ts
 import { Resource } from 'nitrostack';
-import { mongodb } from '../lib/mongodb';
+import { darwinApi } from '../lib/darwin-api';  // NEW: Use Darwin API
 
 @Resource({
   uri: 'darwin://signals',
@@ -625,8 +567,8 @@ import { mongodb } from '../lib/mongodb';
   mimeType: 'application/json',
 })
 export async function signalsResource() {
-  const signals = await mongodb.find('signals', {}, { limit: 100 });
-  return JSON.stringify(signals, null, 2);
+  const response = await darwinApi.get('/api/signals/?limit=100');
+  return JSON.stringify(response.signals, null, 2);
 }
 
 @Resource({
@@ -636,15 +578,15 @@ export async function signalsResource() {
   mimeType: 'application/json',
 })
 export async function criticalSignalsResource() {
-  const signals = await mongodb.find('signals', { severity: 'critical' });
-  return JSON.stringify(signals, null, 2);
+  const response = await darwinApi.get('/api/signals/?severity=critical');
+  return JSON.stringify(response.signals, null, 2);
 }
 ```
 
 ```typescript
 // src/resources/issues-resource.ts
 import { Resource } from 'nitrostack';
-import { mongodb } from '../lib/mongodb';
+import { darwinApi } from '../lib/darwin-api';
 
 @Resource({
   uri: 'darwin://issues',
@@ -653,8 +595,8 @@ import { mongodb } from '../lib/mongodb';
   mimeType: 'application/json',
 })
 export async function issuesResource() {
-  const issues = await mongodb.find('ux_issues', {}, { limit: 50 });
-  return JSON.stringify(issues, null, 2);
+  const response = await darwinApi.get('/api/ux-issues/?limit=50');
+  return JSON.stringify(response.issues, null, 2);
 }
 
 @Resource({
@@ -664,15 +606,15 @@ export async function issuesResource() {
   mimeType: 'application/json',
 })
 export async function pendingIssuesResource() {
-  const issues = await mongodb.find('ux_issues', { status: 'diagnosed' });
-  return JSON.stringify(issues, null, 2);
+  const response = await darwinApi.get('/api/ux-issues/pending-review');
+  return JSON.stringify(response.issues, null, 2);
 }
 ```
 
 ```typescript
 // src/resources/prs-resource.ts
 import { Resource } from 'nitrostack';
-import { mongodb } from '../lib/mongodb';
+import { darwinApi } from '../lib/darwin-api';
 
 @Resource({
   uri: 'darwin://pull-requests',
@@ -681,8 +623,8 @@ import { mongodb } from '../lib/mongodb';
   mimeType: 'application/json',
 })
 export async function prsResource() {
-  const prs = await mongodb.find('pull_requests', {}, { limit: 50 });
-  return JSON.stringify(prs, null, 2);
+  const response = await darwinApi.get('/api/pull-requests/?limit=50');
+  return JSON.stringify(response.pull_requests, null, 2);
 }
 ```
 
@@ -2372,4 +2314,14 @@ npm run build
 
 *This plan ensures 100% utilization of NitroStack features for a winning hackathon presentation!*
 
-*Last Updated: February 6, 2026*
+---
+
+## 📚 Related Documentation
+
+- [Darwin REST API Documentation](./API_KEY_AUTHENTICATION.md)
+- [Hackathon Status](./HACKATHON_STATUS.md)
+- [Darwin Agents Explained](./DARWIN_AGENTS_EXPLAINED.md)
+
+---
+
+*Last Updated: February 7, 2026*
