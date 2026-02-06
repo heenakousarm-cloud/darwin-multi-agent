@@ -80,6 +80,14 @@ class Settings(BaseSettings):
         description="Enable debug logging"
     )
     
+    # ===================
+    # Darwin API Settings
+    # ===================
+    DARWIN_API_KEY: Optional[str] = Field(
+        default=None,
+        description="API key for Darwin REST API authentication"
+    )
+    
     class Config:
         env_file = ".env"
         env_file_encoding = "utf-8"
