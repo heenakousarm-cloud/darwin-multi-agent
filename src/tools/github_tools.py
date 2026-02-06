@@ -78,7 +78,7 @@ class GitHubReadTool(BaseTool):
 
 
 class GitHubPRInput(BaseModel):
-    """Input schema for GitHub PR tool."""
+    """Input schema for GitHub PR tool - PATCH BASED (no full file needed)."""
     title: str = Field(
         description="PR title (e.g., '🧬 Darwin Fix: Increase button touch target')"
     )
@@ -88,8 +88,11 @@ class GitHubPRInput(BaseModel):
     file_path: str = Field(
         description="Path to the file to modify"
     )
-    new_content: str = Field(
-        description="New content for the file"
+    original_code: str = Field(
+        description="The original code snippet to find and replace (copy exactly from the file)"
+    )
+    suggested_code: str = Field(
+        description="The new code to replace the original with"
     )
     branch_name: Optional[str] = Field(
         default=None,
@@ -103,34 +106,104 @@ class GitHubPRInput(BaseModel):
 
 class GitHubPRTool(BaseTool):
     """
-    Create a GitHub Pull Request with code changes.
+    Create a GitHub Pull Request with code changes using PATCH approach.
     
     Used by: Engineer Agent
+    
+    This tool uses a PATCH-BASED approach:
+    - You provide original_code (what to find) and suggested_code (what to replace with)
+    - The tool reads the file, applies the replacement, and creates the PR
+    - You do NOT need to provide the entire file content!
     """
     
     name: str = "github_create_pr"
     description: str = """
-    Create a GitHub Pull Request with code fixes.
-    This tool will:
-    1. Create a new branch
-    2. Commit the file changes
-    3. Open a Pull Request
+    Create a GitHub Pull Request with code fixes using PATCH approach.
     
-    Provide the PR title, description, file path, and new file content.
+    IMPORTANT: This tool uses find-and-replace, NOT full file content!
+    
+    You need to provide:
+    - title: PR title
+    - body: PR description
+    - file_path: Path to the file
+    - original_code: The EXACT code snippet to find (copy from the issue's recommended_fix)
+    - suggested_code: The new code to replace it with (copy from the issue's recommended_fix)
+    
+    The tool will:
+    1. Read the current file from GitHub
+    2. Find and replace original_code with suggested_code
+    3. Create a new branch
+    4. Commit the changes
+    5. Open a Pull Request
+    
     Returns the PR URL on success.
     """
     args_schema: Type[BaseModel] = GitHubPRInput
+    
+    def _apply_patch(self, content: str, original_code: str, suggested_code: str) -> str:
+        """Apply the code patch using find-and-replace."""
+        # Normalize line endings
+        content = content.replace('\r\n', '\n')
+        original_code = original_code.replace('\r\n', '\n')
+        suggested_code = suggested_code.replace('\r\n', '\n')
+        
+        # Also handle escaped newlines from JSON
+        original_code = original_code.replace('\\n', '\n')
+        suggested_code = suggested_code.replace('\\n', '\n')
+        
+        # Try direct replacement first
+        if original_code in content:
+            return content.replace(original_code, suggested_code, 1)
+        
+        # Try with normalized whitespace (strip trailing spaces from each line)
+        original_lines = [line.rstrip() for line in original_code.split('\n')]
+        content_lines = content.split('\n')
+        content_lines_stripped = [line.rstrip() for line in content_lines]
+        
+        # Find matching section
+        for i in range(len(content_lines) - len(original_lines) + 1):
+            match = True
+            for j, orig_line in enumerate(original_lines):
+                if content_lines_stripped[i + j] != orig_line.rstrip():
+                    match = False
+                    break
+            
+            if match:
+                # Found the match - replace preserving original indentation
+                result_lines = content_lines[:i]
+                
+                # Get base indentation from first matched line
+                first_line = content_lines[i]
+                base_indent = len(first_line) - len(first_line.lstrip())
+                
+                # Add suggested code
+                for k, suggested_line in enumerate(suggested_code.split('\n')):
+                    if k == 0:
+                        # First line keeps original indentation
+                        result_lines.append(' ' * base_indent + suggested_line.lstrip())
+                    elif suggested_line.strip():
+                        # Non-empty lines: preserve relative indentation
+                        result_lines.append(' ' * base_indent + suggested_line.lstrip())
+                    else:
+                        # Empty lines
+                        result_lines.append('')
+                
+                result_lines.extend(content_lines[i + len(original_lines):])
+                return '\n'.join(result_lines)
+        
+        raise ValueError(f"Could not find original code in file. Make sure original_code matches exactly.")
     
     def _run(
         self,
         title: str,
         body: str,
         file_path: str,
-        new_content: str,
+        original_code: str,
+        suggested_code: str,
         branch_name: Optional[str] = None,
         base_branch: str = "main"
     ) -> str:
-        """Create a PR with the specified changes."""
+        """Create a PR with the specified patch changes."""
         settings = get_settings()
         
         try:
@@ -153,6 +226,22 @@ class GitHubPRTool(BaseTool):
             base_ref = repo.get_branch(base_branch)
             base_sha = base_ref.commit.sha
             
+            # Read current file content
+            try:
+                current_file = repo.get_contents(file_path, ref=base_branch)
+                current_content = base64.b64decode(current_file.content).decode('utf-8')
+                file_sha = current_file.sha
+            except GithubException as e:
+                if e.status == 404:
+                    return f"Error: File not found: {file_path}"
+                raise
+            
+            # Apply the patch
+            try:
+                new_content = self._apply_patch(current_content, original_code, suggested_code)
+            except ValueError as e:
+                return f"Error applying patch: {str(e)}"
+            
             # Create new branch
             try:
                 repo.create_git_ref(
@@ -165,30 +254,14 @@ class GitHubPRTool(BaseTool):
                 else:
                     raise
             
-            # Get current file SHA (needed for update)
-            try:
-                current_file = repo.get_contents(file_path, ref=branch_name)
-                file_sha = current_file.sha
-                
-                # Update file
-                repo.update_file(
-                    path=file_path,
-                    message=f"🧬 Darwin: {title}",
-                    content=new_content,
-                    sha=file_sha,
-                    branch=branch_name
-                )
-            except GithubException as e:
-                if e.status == 404:
-                    # File doesn't exist, create it
-                    repo.create_file(
-                        path=file_path,
-                        message=f"🧬 Darwin: {title}",
-                        content=new_content,
-                        branch=branch_name
-                    )
-                else:
-                    raise
+            # Update file on the new branch
+            repo.update_file(
+                path=file_path,
+                message=f"🧬 Darwin: {title}",
+                content=new_content,
+                sha=file_sha,
+                branch=branch_name
+            )
             
             # Create Pull Request
             pr = repo.create_pull(
@@ -212,6 +285,7 @@ class GitHubPRTool(BaseTool):
 
 ### Changes Made:
 - Modified: `{file_path}`
+- Applied patch: Replaced original code with suggested fix
 
 ### Next Steps:
 1. Review the changes at {pr.html_url}
