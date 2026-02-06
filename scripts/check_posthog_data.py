@@ -386,7 +386,7 @@ def generate_recommendations(friction_checks, event_count):
         "Run Darwin:\n"
         "  cd ~/Desktop/Hackathon/darwin-multi-agent\n"
         "  source venv/bin/activate\n"
-        "  python scripts/run_darwin.py --mode watch",
+        "  python scripts/run_darwin.py --mode analyze",
         title="Next Steps",
         border_style="green"
     ))

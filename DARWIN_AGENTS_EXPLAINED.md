@@ -463,7 +463,7 @@ python scripts/run_darwin.py --mode full
 ### Individual Modes
 ```bash
 # Only Watcher (detect signals)
-python scripts/run_darwin.py --mode watch
+python scripts/run_darwin.py --mode analyze
 
 # Watcher + Analyst (detect + analyze)
 python scripts/run_darwin.py --mode analyze
