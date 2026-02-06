@@ -209,16 +209,46 @@ def seed_demo_data():
 def run_pipeline(mode: str, verbose: bool = True):
     """Run the Darwin pipeline."""
     from src.crew import run_darwin
+    from src.db import log_agent_action, save_insight, save_product_metric, create_task
     
     console.print()
     console.print(f"[bold yellow]🚀 Running Darwin in {mode.upper()} mode...[/bold yellow]")
     console.print()
+    
+    # Log pipeline start
+    log_agent_action(
+        agent_name="Darwin Pipeline",
+        action="pipeline_started",
+        details={"mode": mode, "verbose": verbose},
+        status="started"
+    )
     
     result = run_darwin(mode=mode, verbose=verbose)
     
     console.print()
     
     if result.get("success"):
+        # Log success
+        log_agent_action(
+            agent_name="Darwin Pipeline",
+            action="pipeline_completed",
+            details={
+                "mode": result.get('mode'),
+                "agents_used": result.get('agents_used'),
+                "tasks_completed": result.get('tasks_completed')
+            },
+            status="success"
+        )
+        
+        # Save insights based on mode
+        if mode == "analyze":
+            _save_analysis_insights()
+        elif mode == "engineer":
+            _save_engineering_insights()
+        
+        # Save product metrics
+        _save_pipeline_metrics(mode, result)
+        
         console.print(Panel(
             f"[bold green]✅ Darwin completed successfully![/bold green]\n\n"
             f"Mode: {result.get('mode')}\n"
@@ -227,6 +257,14 @@ def run_pipeline(mode: str, verbose: bool = True):
             border_style="green"
         ))
     else:
+        # Log failure
+        log_agent_action(
+            agent_name="Darwin Pipeline",
+            action="pipeline_failed",
+            details={"mode": mode, "error": result.get('error', 'Unknown')},
+            status="failed"
+        )
+        
         console.print(Panel(
             f"[bold red]❌ Darwin encountered an error[/bold red]\n\n"
             f"Error: {result.get('error', 'Unknown error')}",
@@ -234,6 +272,166 @@ def run_pipeline(mode: str, verbose: bool = True):
         ))
     
     return result
+
+
+def _save_analysis_insights():
+    """Save insights after analysis mode."""
+    from src.db import save_insight, find_many, count, create_task
+    
+    # Count signals by type
+    signals = find_many("signals", {}, limit=100)
+    signal_types = {}
+    for sig in signals:
+        sig_type = sig.get("type", "unknown")
+        signal_types[sig_type] = signal_types.get(sig_type, 0) + 1
+    
+    if signal_types:
+        save_insight(
+            insight_type="signal_distribution",
+            title="Friction Signal Distribution",
+            description=f"Distribution of {len(signals)} detected friction signals by type",
+            data={"signal_counts": signal_types, "total_signals": len(signals)},
+            severity="info"
+        )
+    
+    # Count issues by priority
+    issues = find_many("ux_issues", {}, limit=100)
+    priority_counts = {}
+    for issue in issues:
+        priority = issue.get("priority", "unknown")
+        priority_counts[priority] = priority_counts.get(priority, 0) + 1
+    
+    if priority_counts:
+        save_insight(
+            insight_type="issue_priority_distribution",
+            title="UX Issue Priority Distribution",
+            description=f"Distribution of {len(issues)} UX issues by priority",
+            data={"priority_counts": priority_counts, "total_issues": len(issues)},
+            severity="info"
+        )
+    
+    # High severity insight
+    high_priority = priority_counts.get("high", 0) + priority_counts.get("critical", 0)
+    if high_priority > 0:
+        save_insight(
+            insight_type="high_priority_alert",
+            title=f"{high_priority} High Priority Issues Detected",
+            description="These issues should be addressed immediately to improve user experience",
+            data={"high_priority_count": high_priority},
+            severity="warning"
+        )
+    
+    # Create tasks for diagnosed issues
+    diagnosed_issues = find_many("ux_issues", {"status": "diagnosed"}, limit=50)
+    for issue in diagnosed_issues:
+        create_task(
+            task_type="review_fix",
+            title=f"Review: {issue.get('title', 'Untitled')[:50]}",
+            description=f"Review and approve the recommended fix for this UX issue",
+            priority=issue.get("priority", "medium"),
+            assigned_agent="Human Reviewer",
+            related_issue_id=issue.get("_id")
+        )
+    
+    # Create tasks for approved issues waiting for PR
+    approved_issues = find_many("ux_issues", {"status": "approved"}, limit=50)
+    for issue in approved_issues:
+        create_task(
+            task_type="create_pr",
+            title=f"Create PR: {issue.get('title', 'Untitled')[:50]}",
+            description=f"Create a GitHub Pull Request for this approved fix",
+            priority="high",
+            assigned_agent="Engineer Agent",
+            related_issue_id=issue.get("_id")
+        )
+
+
+def _save_engineering_insights():
+    """Save insights after engineering mode."""
+    from src.db import save_insight, find_many, save_code_fix
+    
+    # Get recent PRs
+    prs = find_many("pull_requests", {}, limit=10)
+    
+    if prs:
+        save_insight(
+            insight_type="pr_activity",
+            title=f"{len(prs)} Pull Requests Created",
+            description="Darwin has automatically generated code fixes",
+            data={
+                "pr_count": len(prs),
+                "pr_urls": [pr.get("pr_url") for pr in prs]
+            },
+            severity="info"
+        )
+    
+    # Save code fixes from issues that have PRs
+    issues_with_prs = find_many("ux_issues", {"status": "pr_created"}, limit=50)
+    for issue in issues_with_prs:
+        rec_fix = issue.get("recommended_fix", {})
+        if isinstance(rec_fix, list):
+            rec_fix = rec_fix[0] if rec_fix else {}
+        
+        if rec_fix.get("original_code") and rec_fix.get("suggested_code"):
+            save_code_fix(
+                issue_id=issue.get("_id"),
+                file_path=rec_fix.get("file_path", issue.get("file_path", "unknown")),
+                original_code=rec_fix.get("original_code", ""),
+                fixed_code=rec_fix.get("suggested_code", ""),
+                fix_type=issue.get("root_cause", "ux_improvement")[:50],
+                pr_number=None  # Would need to link from pull_requests
+            )
+
+
+def _save_pipeline_metrics(mode: str, result: dict):
+    """Save product metrics after pipeline run."""
+    from src.db import save_product_metric, count
+    
+    # Pipeline execution metric
+    save_product_metric(
+        metric_name="pipeline_execution",
+        value=1,
+        unit="count",
+        dimensions={"mode": mode, "success": result.get("success", False)}
+    )
+    
+    # Collection counts
+    save_product_metric(
+        metric_name="total_signals",
+        value=count("signals", {}),
+        unit="count",
+        dimensions={"collection": "signals"}
+    )
+    
+    save_product_metric(
+        metric_name="total_ux_issues",
+        value=count("ux_issues", {}),
+        unit="count",
+        dimensions={"collection": "ux_issues"}
+    )
+    
+    save_product_metric(
+        metric_name="total_pull_requests",
+        value=count("pull_requests", {}),
+        unit="count",
+        dimensions={"collection": "pull_requests"}
+    )
+    
+    # Issues by status
+    from src.db import find_many
+    issues = find_many("ux_issues", {}, limit=1000)
+    status_counts = {}
+    for issue in issues:
+        status = issue.get("status", "unknown")
+        status_counts[status] = status_counts.get(status, 0) + 1
+    
+    for status, cnt in status_counts.items():
+        save_product_metric(
+            metric_name=f"issues_{status}",
+            value=cnt,
+            unit="count",
+            dimensions={"status": status}
+        )
 
 
 def main():

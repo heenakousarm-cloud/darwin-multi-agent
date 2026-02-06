@@ -17,6 +17,9 @@ from .mongodb import (
     tasks_collection,
     pull_requests_collection,
     agent_logs_collection,
+    code_fixes_collection,
+    insights_collection,
+    product_metrics_collection,
     # Serialization
     serialize_doc,
     serialize_docs,
@@ -35,6 +38,12 @@ from .mongodb import (
     get_unprocessed_signals,
     get_pending_tasks,
     get_issues_for_review,
+    # Logging functions
+    log_agent_action,
+    save_code_fix,
+    save_insight,
+    save_product_metric,
+    create_task,
 )
 
 __all__ = [
@@ -48,6 +57,9 @@ __all__ = [
     "tasks_collection",
     "pull_requests_collection",
     "agent_logs_collection",
+    "code_fixes_collection",
+    "insights_collection",
+    "product_metrics_collection",
     "serialize_doc",
     "serialize_docs",
     "to_object_id",
@@ -63,4 +75,9 @@ __all__ = [
     "get_unprocessed_signals",
     "get_pending_tasks",
     "get_issues_for_review",
+    "log_agent_action",
+    "save_code_fix",
+    "save_insight",
+    "save_product_metric",
+    "create_task",
 ]

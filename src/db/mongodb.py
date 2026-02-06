@@ -70,6 +70,21 @@ def agent_logs_collection() -> Collection:
     return get_collection("agent_logs")
 
 
+def code_fixes_collection() -> Collection:
+    """Get the code_fixes collection."""
+    return get_collection("code_fixes")
+
+
+def insights_collection() -> Collection:
+    """Get the insights collection."""
+    return get_collection("insights")
+
+
+def product_metrics_collection() -> Collection:
+    """Get the product_metrics collection."""
+    return get_collection("product_metrics")
+
+
 # ===================
 # Helper Functions
 # ===================
@@ -235,3 +250,115 @@ def get_stats() -> Dict[str, Any]:
         stats["total_documents"] += col_count
     
     return stats
+
+
+# ===================
+# Logging Functions
+# ===================
+
+def log_agent_action(
+    agent_name: str,
+    action: str,
+    details: Dict[str, Any],
+    status: str = "success"
+) -> str:
+    """Log an agent action to agent_logs collection."""
+    from datetime import datetime
+    
+    log_entry = {
+        "agent": agent_name,
+        "action": action,
+        "details": details,
+        "status": status,
+        "timestamp": datetime.utcnow().isoformat(),
+    }
+    return insert_one("agent_logs", log_entry)
+
+
+def save_code_fix(
+    issue_id: str,
+    file_path: str,
+    original_code: str,
+    fixed_code: str,
+    fix_type: str,
+    pr_number: Optional[int] = None
+) -> str:
+    """Save a code fix to code_fixes collection."""
+    from datetime import datetime
+    
+    fix_entry = {
+        "issue_id": issue_id,
+        "file_path": file_path,
+        "original_code": original_code,
+        "fixed_code": fixed_code,
+        "fix_type": fix_type,
+        "pr_number": pr_number,
+        "applied_at": datetime.utcnow().isoformat(),
+        "status": "applied" if pr_number else "pending"
+    }
+    return insert_one("code_fixes", fix_entry)
+
+
+def save_insight(
+    insight_type: str,
+    title: str,
+    description: str,
+    data: Dict[str, Any],
+    severity: str = "info"
+) -> str:
+    """Save an insight to insights collection."""
+    from datetime import datetime
+    
+    insight_entry = {
+        "type": insight_type,
+        "title": title,
+        "description": description,
+        "data": data,
+        "severity": severity,
+        "created_at": datetime.utcnow().isoformat(),
+    }
+    return insert_one("insights", insight_entry)
+
+
+def save_product_metric(
+    metric_name: str,
+    value: float,
+    unit: str,
+    dimensions: Dict[str, Any] = None
+) -> str:
+    """Save a product metric to product_metrics collection."""
+    from datetime import datetime
+    
+    metric_entry = {
+        "metric_name": metric_name,
+        "value": value,
+        "unit": unit,
+        "dimensions": dimensions or {},
+        "recorded_at": datetime.utcnow().isoformat(),
+    }
+    return insert_one("product_metrics", metric_entry)
+
+
+def create_task(
+    task_type: str,
+    title: str,
+    description: str,
+    priority: str = "medium",
+    assigned_agent: str = None,
+    related_issue_id: str = None
+) -> str:
+    """Create a task in tasks collection."""
+    from datetime import datetime
+    
+    task_entry = {
+        "type": task_type,
+        "title": title,
+        "description": description,
+        "priority": priority,
+        "assigned_agent": assigned_agent,
+        "related_issue_id": related_issue_id,
+        "status": "pending",
+        "created_at": datetime.utcnow().isoformat(),
+        "updated_at": datetime.utcnow().isoformat(),
+    }
+    return insert_one("tasks", task_entry)
