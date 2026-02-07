@@ -53,7 +53,8 @@ async def run_darwin_pipeline(
         }
     
     # Get the project root directory
-    project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    # __file__ = api/routes/darwin.py, need to go up 3 levels to reach project root
+    project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
     script_path = os.path.join(project_root, "scripts", "run_darwin.py")
     venv_python = os.path.join(project_root, "venv", "bin", "python")
     
@@ -106,7 +107,8 @@ async def get_darwin_status():
     
     Returns information about available modes and system health.
     """
-    project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    # __file__ = api/routes/darwin.py, need to go up 3 levels to reach project root
+    project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
     
     # Check if key files exist
     checks = {
