@@ -20,7 +20,7 @@
 | Phase 4: CrewAI Agents | ✅ Complete | 100% | ~10 min |
 | Phase 5: Tasks & Crew | ✅ Complete | 100% | ~15 min |
 | Phase 5.5: Darwin REST API | ✅ Complete | 100% | ~3 hrs |
-| Phase 6: NitroStack MCP Server | ⬜ Not Started | 0% | - |
+| Phase 6: NitroStack MCP Server | 🟡 In Progress | 35% | ~1.5 hrs |
 | Phase 7: Integration Testing | ⬜ Not Started | 0% | - |
 | Phase 8: Demo Polish | ⬜ Not Started | 0% | - |
 
@@ -433,63 +433,61 @@
 
 ## Phase 6: NitroStack MCP Server (darwin-acceleration-engine)
 **Estimated Time:** 12-15 hours  
-**Actual Time:** _______________  
-**Status:** ⬜ Not Started
+**Actual Time:** ~30 min (Phase 6.1)  
+**Status:** 🟡 In Progress
 
 > **Reference:** See `docs/NITROSTACK_IMPLEMENTATION_PLAN.md` for detailed code examples
 
-### 6.1 Project Setup (30 min)
-- [ ] Navigate to Hackathon folder: `cd /Users/heena/Desktop/Hackathon`
-- [ ] Initialize NitroStack: `npx nitrostack init darwin-acceleration-engine`
-- [ ] Review generated template structure
-- [ ] Create `.env` file with:
-  - [ ] `DARWIN_API_URL=http://localhost:8000`
-  - [ ] `DARWIN_API_KEY=darwin_sk_...`
-  - [ ] `NITROSTACK_PORT=3000`
-- [ ] Install additional dependencies:
-  - [ ] `npm install zod`
-  - [ ] `npm install framer-motion`
-  - [ ] `npm install recharts`
-  - [ ] `npm install -D @types/react`
-- [ ] Update `nitrostack.config.ts` with Darwin theme
+### 6.1 Project Setup (30 min) ✅ COMPLETE
+- [x] Navigate to Hackathon folder: `cd /Users/heena/Desktop/Hackathon`
+- [x] Initialize NitroStack: `npx @nitrostack/cli init darwin-acceleration-engine`
+- [x] Selected "Advanced" template (typescript-pizzaz with widgets)
+- [x] Review generated template structure
+- [x] Create `.env` file with:
+  - [x] `DARWIN_API_URL=http://localhost:8000`
+  - [x] `DARWIN_API_KEY=darwin_sk_6hhy8503b6m96nmuv5w84pu5ey5ex8hp`
+  - [x] `NITROSTACK_PORT=3000`
+- [x] Dependencies installed (zod already included in template)
+- [x] Created `.gitignore` for NitroStack project
+- [x] Updated `package.json` with Darwin description & keywords
+- [x] Updated `README.md` with Darwin documentation
+- [x] Initialized git and connected to GitHub remote
+- [x] Tested server starts successfully (`npm run dev`)
 
-### 6.2 Darwin API Client (15 min)
-- [ ] Create `src/lib/darwin-api.ts`
-- [ ] Implement `DarwinApiClient` class
-  - [ ] `get(path)` method
-  - [ ] `post(path, body)` method
-  - [ ] Bearer token authentication
-- [ ] Export `darwinApi` instance
-- [ ] Test API connection
+### 6.2 Darwin API Client (15 min) ✅ COMPLETE
+- [x] Create `src/lib/darwin-api.ts`
+- [x] Implement `DarwinApiClient` class
+  - [x] `get(path)` method
+  - [x] `post(path, body)` method
+  - [x] `put(path, body)` method
+  - [x] `delete(path)` method
+  - [x] Bearer token authentication
+- [x] Added convenience methods for all Darwin endpoints:
+  - [x] `healthCheck()`, `getSignals()`, `getUxIssues()`
+  - [x] `approveIssue()`, `rejectIssue()`, `getPullRequests()`
+  - [x] `triggerDarwin()`, `getStats()`, `getInsights()`
+- [x] Export `darwinApi` singleton instance
+- [x] Test API connection ✅ (NitroStudio connected, pizza tools working)
 
-### 6.3 Tools - Core MCP Feature #1 (2 hours)
-- [ ] Create `src/tools/get-signals.ts`
-  - [ ] `@Tool` decorator with description
-  - [ ] Input schema with Zod
-  - [ ] Calls `GET /api/signals/`
-  - [ ] `@Widget('signals-dashboard')` attached
-- [ ] Create `src/tools/get-ux-issues.ts`
-  - [ ] `@Tool` decorator with description
-  - [ ] Input schema with Zod
-  - [ ] Calls `GET /api/ux-issues/`
-  - [ ] `@Widget('decision-center')` attached
-- [ ] Create `src/tools/approve-fix.ts`
-  - [ ] `@Tool` decorator with description
-  - [ ] Input schema (issue_id, create_pr_immediately)
-  - [ ] Calls `POST /api/ux-issues/{id}/approve`
-- [ ] Create `src/tools/reject-fix.ts`
-  - [ ] `@Tool` decorator with description
-  - [ ] Calls `POST /api/ux-issues/{id}/reject`
-- [ ] Create `src/tools/get-pull-requests.ts`
-  - [ ] `@Tool` decorator with description
-  - [ ] Calls `GET /api/pull-requests/`
-  - [ ] `@Widget('pr-viewer')` attached
-- [ ] Create `src/tools/trigger-darwin.ts`
-  - [ ] `@Tool` decorator with description
-  - [ ] Input schema (mode: analyze/engineer/full)
-  - [ ] Calls `POST /api/darwin/run`
-- [ ] Create `src/tools/get-stats.ts`
-  - [ ] Calls `GET /api/stats/`
+### 6.3 Tools - Core MCP Feature #1 (2 hours) ✅ COMPLETE
+- [x] Created `src/modules/darwin/darwin.tools.ts` with 7 tools:
+  - [x] `get_signals` - @Tool + @Widget('signals-dashboard')
+  - [x] `get_ux_issues` - @Tool + @Widget('decision-center')
+  - [x] `approve_fix` - @Tool with issue_id, create_pr_immediately
+  - [x] `reject_fix` - @Tool with issue_id, reason
+  - [x] `get_pull_requests` - @Tool + @Widget('pr-viewer')
+  - [x] `trigger_darwin` - @Tool with mode (analyze/engineer/full)
+  - [x] `get_stats` - @Tool for dashboard statistics
+- [x] Created `src/modules/darwin/darwin.service.ts`
+  - [x] Connects to Darwin REST API via darwinApi client
+  - [x] Error handling for all endpoints
+- [x] Created `src/modules/darwin/darwin.module.ts`
+- [x] Updated `src/app.module.ts` to include DarwinModule
+- [x] Updated `src/index.ts` with Darwin branding
+- [x] ~~Create `src/tools/get-stats.ts`~~ (Implemented in `darwin.tools.ts`)
+  - [x] Calls `GET /api/stats/` via `darwinService.getStats()`
+
+> **Note:** All 7 tools are implemented in a single file `src/modules/darwin/darwin.tools.ts` following NitroStack's module pattern, rather than separate files.
 
 ### 6.4 Resources - Core MCP Feature #2 (1 hour)
 - [ ] Create `src/resources/signals-resource.ts`
@@ -662,9 +660,14 @@
 
 **Phase 6 Notes:**
 ```
-(Add notes as you implement)
-
-
+Phase 6.1 Complete (Feb 7, 2026):
+- Used @nitrostack/cli v1.0.6 to initialize project
+- Selected "Advanced" template (typescript-pizzaz) for widget examples
+- Template includes: tools, widgets, services, modules pattern
+- .env configured with Darwin API URL and key
+- Server tested and starts successfully
+- Git repo connected to GitHub: darwin-acceleration-engine
+- Next: Phase 6.2 - Create Darwin API client to replace pizza service
 ```
 
 ---
