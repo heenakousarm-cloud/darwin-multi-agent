@@ -168,7 +168,24 @@ class MongoDBWriteTool(BaseTool):
                 except json.JSONDecodeError:
                     pass
             
-            # Strategy 3: Try to extract JSON from markdown code block
+            # Strategy 3: Escape literal control characters in JSON strings
+            # LLMs often produce JSON with literal newlines/tabs inside string
+            # values (e.g., in code snippets). JSON requires these to be escaped.
+            if doc_dict is None:
+                try:
+                    cleaned = document
+                    cleaned = cleaned.replace('\r\n', '\\n')  # CRLF → \n escape
+                    cleaned = cleaned.replace('\r', '\\n')     # CR → \n escape
+                    cleaned = cleaned.replace('\n', '\\n')     # LF → \n escape
+                    cleaned = cleaned.replace('\t', '\\t')     # TAB → \t escape
+                    # Remove any remaining control characters (0x00-0x1F)
+                    import re as _re
+                    cleaned = _re.sub(r'[\x00-\x08\x0b\x0c\x0e-\x1f]', '', cleaned)
+                    doc_dict = json.loads(cleaned)
+                except (json.JSONDecodeError, Exception):
+                    pass
+            
+            # Strategy 4: Try to extract JSON from markdown code block (renumbered)
             if doc_dict is None:
                 try:
                     import re
@@ -179,7 +196,7 @@ class MongoDBWriteTool(BaseTool):
                 except:
                     pass
             
-            # Strategy 4: Try to parse as Python literal (handles single quotes)
+            # Strategy 5: Try to parse as Python literal (handles single quotes)
             if doc_dict is None:
                 try:
                     import ast
@@ -187,7 +204,7 @@ class MongoDBWriteTool(BaseTool):
                 except:
                     pass
             
-            # Strategy 5: Try aggressive cleaning
+            # Strategy 6: Try aggressive cleaning
             if doc_dict is None:
                 try:
                     # Replace problematic characters
