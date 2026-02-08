@@ -13,7 +13,7 @@ import os
 # Add parent directory to path for imports
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
 
-from src.db import find_many, find_by_id, update_by_id
+from src.db import find_many, find_by_id, update_by_id, find_one
 
 router = APIRouter()
 
@@ -52,6 +52,15 @@ async def get_ux_issues(
     
     issues = find_many("ux_issues", query, limit=limit)
     serialized = [serialize_doc(i) for i in issues]
+    
+    # Enrich issues with pr_url if they have pr_created status
+    for issue in serialized:
+        if issue.get("status") == "pr_created":
+            # Look up PR by issue_id
+            pr = find_one("pull_requests", {"issue_id": issue["_id"]})
+            if pr:
+                issue["pr_url"] = pr.get("pr_url")
+                issue["pr_number"] = pr.get("pr_number")
     
     return {
         "issues": serialized,
