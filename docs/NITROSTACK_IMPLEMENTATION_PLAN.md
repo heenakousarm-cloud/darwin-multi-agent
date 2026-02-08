@@ -70,7 +70,6 @@
 | 19 | Visual/UX | Interactive Buttons | 🔴 Critical | 30 min | ⬜ |
 | 20 | Visual/UX | Charts/Graphs | 🟡 High | 1 hr | ⬜ |
 | 21 | Visual/UX | Animations | 🟢 Medium | 30 min | ⬜ |
-| 22 | Visual/UX | Toast Notifications | 🟡 High | 30 min | ⬜ |
 
 **Total Estimated Time: ~15 hours**
 
@@ -951,8 +950,8 @@ import {
   callTool,           // Feature 10
   sendFollowUpMessage,// Feature 11
   openExternal,       // Feature 12
-  setDisplayMode,     // Feature 14
-} from 'nitrostack/widget-sdk';
+  requestDisplayMode, // Feature 14 (corrected name)
+} from '@nitrostack/widgets';
 import { motion, AnimatePresence } from 'framer-motion'; // Feature 21
 import {
   AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer,
@@ -1034,7 +1033,7 @@ export function SignalsDashboard({ signals, total, summary }: SignalsDashboardPr
   
   // ✅ Feature 14: Display modes - Fullscreen, PiP, Inline
   const handleExpandView = () => {
-    setDisplayMode('fullscreen');
+    requestDisplayMode('fullscreen');
   };
 
   return (
@@ -1281,9 +1280,8 @@ import {
   callTool,
   sendFollowUpMessage,
   openExternal,
-  setDisplayMode,
-  showToast,  // ✅ Feature 22: Toast notifications
-} from 'nitrostack/widget-sdk';
+  requestDisplayMode, // Feature 14 (corrected name)
+} from '@nitrostack/widgets';
 import { motion, AnimatePresence } from 'framer-motion';
 import { CodeDiff } from './CodeDiff';
 
@@ -1349,13 +1347,6 @@ export function DecisionCenter({ issues, total, pending_review }: DecisionCenter
       if (result.success) {
         setApprovedIds([...approvedIds, currentIssue._id]);
         
-        // ✅ Feature 22: Toast notification
-        showToast({
-          type: 'success',
-          message: `✅ Fix approved! ${createPrNow ? 'PR creation started.' : ''}`,
-          duration: 3000,
-        });
-        
         // ✅ Feature 11: Send follow-up message
         sendFollowUpMessage(
           `✅ Approved fix for "${currentIssue.title}". ` +
@@ -1371,11 +1362,6 @@ export function DecisionCenter({ issues, total, pending_review }: DecisionCenter
       }
     } catch (err: any) {
       setError(err.message);
-      showToast({
-        type: 'error',
-        message: `❌ Failed to approve: ${err.message}`,
-        duration: 5000,
-      });
     } finally {
       setLoading(false);
     }
@@ -1383,12 +1369,6 @@ export function DecisionCenter({ issues, total, pending_review }: DecisionCenter
   
   const handleReject = () => {
     sendFollowUpMessage(`⏭️ Skipped fix for "${currentIssue?.title}".`);
-    
-    showToast({
-      type: 'info',
-      message: 'Issue skipped',
-      duration: 2000,
-    });
     
     if (currentIndex < issues.length - 1) {
       setCurrentIndex(currentIndex + 1);
@@ -1404,7 +1384,7 @@ export function DecisionCenter({ issues, total, pending_review }: DecisionCenter
   
   // ✅ Feature 14: Fullscreen mode for better code review
   const handleFullscreen = () => {
-    setDisplayMode('fullscreen');
+    requestDisplayMode('fullscreen');
   };
 
   if (!currentIssue) {
@@ -2252,11 +2232,10 @@ server.listen().then(() => {
 | 19 | Interactive Buttons | Visual/UX | ✅ | DecisionCenter |
 | 20 | Charts/Graphs | Visual/UX | ✅ | SignalsDashboard (Recharts) |
 | 21 | Animations | Visual/UX | ✅ | All widgets (Framer Motion) |
-| 22 | Toast Notifications | Visual/UX | ✅ | DecisionCenter |
 
 ---
 
-## 🎯 COVERAGE: 100% (22/22 Features)
+## 🎯 COVERAGE: 100% (21/21 Features)
 
 ---
 
